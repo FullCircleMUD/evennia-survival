@@ -69,6 +69,12 @@ Meters deplete slowly and consequences land quickly, so the two run on separate 
 - `SURVIVAL_METER_INTERVAL` — how often a character gets hungrier and thirstier.
 - `SURVIVAL_REGEN_INTERVAL` — how often the consequences of that are applied.
 
+**Both are required, and neither is defaulted.** The library could pick a cadence, but the right one is
+a game-design decision, and a default would put our number in someone's game without anyone having
+chosen it. Each must be a positive integer — `"1200"` and `1200.0` are refused, so there is one form to
+write and none to guess at, and zero is refused separately from the type because it is a perfectly good
+integer that gives a clock which never fires.
+
 Both are library-owned scripts sharing one walk over characters: those with an active session, carrying
 the mixin, minus superusers. Doing that walk correctly under a game running as more than one process is
 the fiddly part, and we would rather write it once than have a consumer write the second half of it.
@@ -171,4 +177,6 @@ own persistence.
 - The exact return shape of `at_consume_edible`, above.
 - Whether an out-of-band meter change emits the threshold message immediately, or leaves it to the next
   tick. Current leaning is to leave it to the tick.
-- The setting names above are working names.
+- The names of settings that do not exist yet are working names. The four that do — the two stage
+  modules and the two intervals — are settled, and [installing.md](installing.md) is where a consumer
+  reads them.

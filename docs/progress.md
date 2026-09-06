@@ -2,6 +2,30 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-06 — a game can be configured, and refused
+
+23 tests, all passing. Four settings, validated at boot. Nothing reads them yet.
+
+- **`check_settings()`** in `config.py`, called from `AppConfig.ready()` and nowhere else. Fifteen
+  cases, `CF-01` to `CF-15`.
+- **Every problem in one raise**, one per line behind `PROBLEM_PREFIX`. A consumer installing this has
+  more than one thing to set, and stopping at the first turns that into fix-restart-fix-restart. The
+  constant is also what lets a test count problems without pinning any wording.
+- **Each stage setting gets four checks** — declared, resolves, is a `SurvivalStage` subclass, and the
+  set is workable. The duplicate-value check reads `__members__` and runs before the consecutive check,
+  because Python folds a repeat into the stage before it and what remains can look perfectly
+  consecutive.
+- **A stage module that will not import is refused whatever the reason.** It exists because this
+  library asked for it, so its state is ours to report. The original error is chained rather than
+  swallowed, so a consumer gets the setting *and* their own traceback.
+- **Both clock intervals are required, and neither is defaulted.** The right cadence is a game-design
+  decision; a default would put our number in someone's game unchosen. Each must be a positive integer,
+  with `"1200"` and `1200.0` refused so there is one form to write.
+- **`tests/stage_stubs.py`** — the suite's stage enums, importing nothing but the library, because
+  `ready()` resolves them mid-`django.setup()`.
+- **[installing.md](installing.md)** started. A working note written as each requirement is decided,
+  rather than reconstructed from memory once everything is built.
+
 ## 2026-09-06 — the stage base class
 
 8 tests, all passing. A consumer can declare a meter's stages in a form the library can rely on.

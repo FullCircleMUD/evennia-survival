@@ -23,6 +23,7 @@ decisions are recorded.
 
 | Document | What it covers |
 |---|---|
+| [installing.md](installing.md) | What a game declares to run this library — written as each requirement is decided, so it grows with the machinery |
 | [interoperability.md](interoperability.md) | This library against every sibling library in `libraries/` |
 
 ## Archive

@@ -5,8 +5,9 @@ and a regeneration pipeline that reads them.
 
 ## Status
 
-**Early — one piece built.** You can declare a meter's stages; nothing reads them yet. The rest of the
-machinery lives inside FullCircleMUD and is being extracted from there. See
+**Early — configuration only.** You can declare your meters' stages and the two clock intervals, and
+the game refuses to start if any of it is wrong. Nothing ticks yet: the machinery lives inside
+FullCircleMUD and is being extracted from there. See
 [docs/progress.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/progress.md).
 
 ## The problem it solves
@@ -38,6 +39,8 @@ something other than a clock.
 
 ## Install
 
+**What a game declares is in [docs/installing.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/installing.md)** — the app, the stage enums, and the two clocks.
+
 Nothing is published yet. Editable install for development against a checkout:
 
 ```
@@ -54,6 +57,7 @@ python runtests.py
 
 - [docs/INDEX.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/INDEX.md) — the design wiki
 - [docs/design.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/design.md) — how the library is put together, and the key problems with how each is being solved
+- [docs/installing.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/installing.md) — everything a game declares, growing as each requirement is decided
 - [docs/test-plan.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/test-plan.md) — every case the library commits to covering
 - [docs/interoperability.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/interoperability.md) — this library against its siblings
 - [CLAUDE.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/CLAUDE.md) — context for LLM agents working in this repo

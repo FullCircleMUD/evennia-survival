@@ -21,9 +21,11 @@ For the design wiki, read [docs/INDEX.md](docs/INDEX.md).
 
 ## Project status
 
-**The stage base class is built and tested; nothing else is.** A consumer can declare a meter's stages;
-nothing yet reads them. The rest of the survival machinery is still in FCM. See
-[docs/progress.md](docs/progress.md).
+**A game can be configured, and is refused if it is configured wrongly. Nothing ticks yet.** A consumer
+declares their stages and the two clock intervals, and boot validates all four settings. Nothing reads
+them after that — the meters, the clocks and the commands are still in FCM. See
+[docs/progress.md](docs/progress.md), and [docs/installing.md](docs/installing.md) for what a consumer
+declares today.
 
 ## Where to read first
 
@@ -109,6 +111,8 @@ evennia-survival/
 ├── .gitignore
 ├── docs/                      # design wiki (humans + LLMs)
 │   ├── INDEX.md
+│   ├── design.md              # how the library is put together, and why
+│   ├── installing.md          # what a consumer declares; grows as we decide
 │   ├── progress.md
 │   ├── test-plan.md
 │   ├── interoperability.md
@@ -119,12 +123,16 @@ evennia-survival/
 ├── src/
 │   └── evennia_survival/      # library code (src layout)
 │       ├── __init__.py
+│       ├── apps.py            # AppConfig — ready() runs the boot check
+│       ├── config.py          # the settings, and check_settings()
 │       ├── stages.py          # SurvivalStage — the base a consumer subclasses
 │       ├── log.py             # shim onto Evennia's logger → survival.log
 │       └── tests.py           # unit tests, run via runtests.py
 └── tests/                     # standalone test infrastructure
     ├── __init__.py
     ├── test_settings.py
+    ├── stage_stubs.py         # stage enums; imports nothing but the library
+    ├── raising_stage_module.py
     └── urls.py
 ```
 
@@ -140,9 +148,13 @@ for the demo gamedir. Every library here keeps them separate.
 - **Tests use Django's test runner** via `python runtests.py`, which bootstraps Django then calls
   `evennia._init()`, as the siblings do. Not pytest, and no gamedir required.
 - Development uses a dedicated venv at `venv/` (gitignored), independent of any consumer game.
-- **Stages are declared by the consumer, so the suite declares its own.** `HungerStageStub` in
-  `tests.py` stands in for a consumer's enum. A test needing a badly-formed one declares it inside the
-  test body, since a set the base class refuses cannot exist at module scope.
+- **Stages are declared by the consumer, so the suite declares its own** — in `tests/stage_stubs.py`,
+  which **imports nothing but `evennia_survival.stages`**. `test_settings.py` points the two stage
+  settings there and `ready()` resolves them during `django.setup()`, so anything that module imported
+  would be pulled in while the app registry is still being built. A test needing a badly-formed enum
+  declares it inside the test body, since a set the base class refuses cannot exist at module scope.
+- **The suite boots as a configured instance.** `tests/test_settings.py` declares all four settings; a
+  case wanting one absent overrides it to `None`.
 
 ## Sibling libraries to reference
 

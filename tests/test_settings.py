@@ -40,6 +40,20 @@ DATABASES = {
     },
 }
 
+# The stages for each meter. Required — the library refuses to boot without
+# them, so the suite declares them as any configured instance would. They point
+# at `tests/stage_stubs.py`, which imports nothing but the library: `ready()`
+# resolves these during `django.setup()`, while the app registry is still being
+# built. The library does not distinguish the two meters, so one stub serves
+# both.
+SURVIVAL_HUNGER_STAGES = "tests.stage_stubs.HungerStageStub"
+SURVIVAL_THIRST_STAGES = "tests.stage_stubs.HungerStageStub"
+
+# The two clocks, in seconds. Required for the same reason as the stages: the
+# library declines to pick a cadence on a game's behalf.
+SURVIVAL_METER_INTERVAL = 1200
+SURVIVAL_REGEN_INTERVAL = 20
+
 # Required Django bits
 SECRET_KEY = "test-only-secret"
 TEST_ENVIRONMENT = True
