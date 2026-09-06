@@ -78,11 +78,55 @@ Both are required, and both are positive integers — `"1200"` and `1200.0` are 
 form to write. No default is supplied because the right cadence is a game-design decision, and a
 default would put our number in your game without anyone having chosen it.
 
+## 6. Add the mixin to whatever should get hungry
+
+```python
+# typeclasses/characters.py
+from evennia_survival.mixins import SurvivalMixin
+
+
+class Character(SurvivalMixin, DefaultCharacter):
+    ...
+```
+
+It carries `hunger_level` and `thirst_level`, a free-pass flag behind each, and the methods that move
+them — `restore_hunger(stages, free_pass=False)`, `increase_hunger(stages)`, the thirst pair, and
+`reset_survival_meters()`. Both meters start at the best stage you declared.
+
+**Nothing about it assumes a character.** Put it on a pet, a mount, an NPC — anything that should get
+hungry. Different classes can answer the hooks below differently, which is the point.
+
+## 7. Answer the hooks
+
+Three, all optional to override and all on the mixin.
+
+```python
+def at_pre_survival_tick(self):
+    """Return False to skip this holder's tick."""
+    return bool(self.sessions.count())
+
+def at_post_survival_tick(self):
+    """The meters have just moved."""
+
+def at_regeneration_tick(self, hunger, thirst):
+    """Everything that being this hungry and this thirsty does. Yours entirely."""
+```
+
+**`at_pre_survival_tick` is the only guard there is, and writing it is your job.** A clock reaches
+every holder of the mixin, which is not the same set as the holders that ought to be ticking — a
+logged-out character and a stabled pet both still carry meters. The default permits the tick, so a
+class that overrides nothing works; a game whose holders are not all meant to tick has to say so here,
+and nothing else will say it on your behalf.
+
+**`at_regeneration_tick` is where the game happens.** The library reads no hit points, computes no
+damage and kills nothing, because healing rates depend on posture and location and death means corpses
+and loot. It hands you both meters on a clock and gets out of the way. Whatever guard you want is the
+first line of your own method — there is no pre-hook here, because there is nothing of ours to cancel.
+
 ## Still to come
 
-The rest of the library is not built, so nothing below exists yet. Listed so the shape of the finished
-install is visible:
+Not built yet. Listed so the shape of the finished install is visible:
 
-- The mixin a character typeclass adds to carry the meters.
-- The hook a character implements to decide what a survival tick does to it.
+- The clocks themselves, and how they gather the holders to tick.
 - The mixin an item typeclass adds to become a drink container.
+- The `eat` and `drink` commands, and the hooks behind them.

@@ -5,9 +5,9 @@ and a regeneration pipeline that reads them.
 
 ## Status
 
-**Early — configuration only.** You can declare your meters' stages and the two clock intervals, and
-the game refuses to start if any of it is wrong. Nothing ticks yet: the machinery lives inside
-FullCircleMUD and is being extracted from there. See
+**Early — meters, but no clock yet.** You can declare your stages, add the mixin to whatever should
+get hungry, and move the meters from your own code. Nothing drives them on a timer yet. The rest lives
+inside FullCircleMUD and is being extracted from there. See
 [docs/progress.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/progress.md).
 
 ## The problem it solves

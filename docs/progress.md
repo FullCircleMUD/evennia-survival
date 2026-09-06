@@ -2,6 +2,34 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-06 — meters, and the seams around the tick
+
+38 tests, all passing. An object can carry meters and they can be moved. No clock drives them yet.
+
+- **`SurvivalMixin`** — two meters, a free-pass flag behind each, `restore_`/`increase_` for both, and
+  `reset_survival_meters()`. Fifteen cases, `MX-01` to `MX-15`.
+- **Nothing in it assumes a character.** The suite's fixture is a plain `DefaultObject`, so "a pet can
+  carry this" is what the tests actually exercise rather than something the docs claim.
+- **The stage is stored by name**, behind a private attribute, with `hunger_level` a property that
+  converts. A row reading `"HUNGRY"` means something to anyone looking at the database.
+- **The default is resolved, not declared** — `max(stages).name` behind a callable, because the library
+  does not know a consumer's stages until the setting resolves and a module-scope default would be
+  evaluated while Django is still loading. This is what `config.py`'s accessors were written for.
+- **The tick body is in `services.py`, not on the holder.** The ticking that decrements the meters is
+  what the library is for and is not an extension point. `survival_tick(holder)` spends a pending free
+  pass or steps the meter, bracketed by two hooks the mixin declares.
+- **Three hooks.** `at_pre_survival_tick` cancels on `False` and is the only guard there is;
+  `at_post_survival_tick` runs once the meters have moved; `at_regeneration_tick(hunger, thirst)` is the
+  consumer's entirely and has no pre/post pair, because there is no body of ours to bracket.
+- **A free pass is spent wherever the meter is**, not only at the best stage — a caller can ask for one
+  from anywhere, and a pass only spendable at the top would sit set forever on a meter that never got
+  there. `[TBD — needs discussion: this diverges from FCM, which honours the pass only at FULL.]`
+
+Still open, and the next conversation: how the clocks gather the holders to tick.
+`ObjectDB.get_all_cached_instances()` is verified as reachable, and the property to weigh is that it
+reaches more than the things that ought to tick — which is why the guard hook is mandatory rather than
+optional.
+
 ## 2026-09-06 — a game can be configured, and refused
 
 23 tests, all passing. Four settings, validated at boot. Nothing reads them yet.

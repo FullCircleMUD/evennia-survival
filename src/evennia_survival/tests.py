@@ -8,6 +8,7 @@ the coverage trail reads in both directions.
 from unittest import TestCase
 
 from django.core.exceptions import ImproperlyConfigured
+from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 
 import evennia_survival
@@ -20,6 +21,7 @@ from evennia_survival.config import (
     check_settings,
 )
 from evennia_survival.log import survival_log
+from evennia_survival.services import survival_tick
 from evennia_survival.stages import SurvivalStage
 from tests.stage_stubs import HungerStageStub
 
@@ -224,3 +226,159 @@ class CheckSettingsTests(TestCase):
     def test_cf_15_a_problem_in_the_regen_interval_alone_is_reported(self):
         """CF-15"""
         self._refuses(**{SETTING_REGEN_INTERVAL: 0})
+
+
+class SurvivalMixinTests(DjangoTestCase):
+    """MX — the meters an object carries.
+
+    These need a real Evennia object, because ``AttributeProperty`` reads and
+    writes through an attribute handler.
+    """
+
+    def setUp(self):
+        from evennia import create_object
+
+        from tests.stage_stubs import HungerStageStub
+
+        self.stages = HungerStageStub
+        self.best = HungerStageStub.FULL
+        self.worst = HungerStageStub.STARVING
+        self.obj = create_object(
+            "tests.game_typeclasses.SurvivalObjectStub", key="meter carrier"
+        )
+
+    def test_mx_01_a_new_object_starts_at_the_best_stage(self):
+        """MX-01"""
+        self.assertIs(self.obj.hunger_level, self.best)
+        self.assertIs(self.obj.thirst_level, self.best)
+        self.assertFalse(self.obj.hunger_free_pass_tick)
+        self.assertFalse(self.obj.thirst_free_pass_tick)
+
+    def test_mx_02_a_meter_reads_back_as_the_stage_it_was_set_to(self):
+        """MX-02"""
+        self.obj.hunger_level = self.stages.HUNGRY
+
+        self.assertIs(self.obj.hunger_level, self.stages.HUNGRY)
+
+    def test_mx_03_restoring_moves_the_meter_up(self):
+        """MX-03"""
+        self.obj.hunger_level = self.stages.STARVING
+
+        self.obj.restore_hunger(2)
+
+        self.assertIs(self.obj.hunger_level, self.stages.HUNGRY)
+
+    def test_mx_04_increasing_moves_the_meter_down(self):
+        """MX-04"""
+        self.obj.increase_hunger(2)
+
+        self.assertIs(self.obj.hunger_level, self.stages.HUNGRY)
+
+    def test_mx_05_restoring_past_the_best_stage_stops_there(self):
+        """MX-05"""
+        self.obj.hunger_level = self.stages.HUNGRY
+
+        self.obj.restore_hunger(99)
+
+        self.assertIs(self.obj.hunger_level, self.best)
+
+    def test_mx_06_increasing_past_the_worst_stage_stops_there(self):
+        """MX-06"""
+        self.obj.increase_hunger(99)
+
+        self.assertIs(self.obj.hunger_level, self.worst)
+
+    def test_mx_07_moving_one_meter_leaves_the_other_alone(self):
+        """MX-07"""
+        self.obj.increase_thirst(2)
+
+        self.assertIs(self.obj.thirst_level, self.stages.HUNGRY)
+        self.assertIs(self.obj.hunger_level, self.best)
+
+    def test_mx_08_restoring_with_a_free_pass_sets_the_flag(self):
+        """MX-08"""
+        self.obj.hunger_level = self.stages.HUNGRY
+
+        self.obj.restore_hunger(1, free_pass=True)
+
+        self.assertTrue(self.obj.hunger_free_pass_tick)
+        self.assertFalse(self.obj.thirst_free_pass_tick)
+
+    def test_mx_09_restoring_without_asking_leaves_the_flag_alone(self):
+        """MX-09"""
+        self.obj.hunger_level = self.stages.HUNGRY
+
+        self.obj.restore_hunger(1)
+
+        self.assertFalse(self.obj.hunger_free_pass_tick)
+
+    def test_mx_10_resetting_puts_both_meters_back(self):
+        """MX-10"""
+        self.obj.increase_hunger(3)
+        self.obj.increase_thirst(3)
+
+        self.obj.reset_survival_meters()
+
+        self.assertIs(self.obj.hunger_level, self.best)
+        self.assertIs(self.obj.thirst_level, self.best)
+
+    def test_mx_11_a_survival_tick_steps_both_meters_down(self):
+        """MX-11"""
+        survival_tick(self.obj)
+
+        self.assertIs(self.obj.hunger_level, self.best.shifted(-1))
+        self.assertIs(self.obj.thirst_level, self.best.shifted(-1))
+
+    def test_mx_12_a_free_pass_is_spent_instead_of_stepping(self):
+        """MX-12"""
+        self.obj.hunger_level = self.stages.HUNGRY
+        self.obj.restore_hunger(1, free_pass=True)
+
+        survival_tick(self.obj)
+
+        # Hunger held where the pass was granted; thirst has no pass and moved.
+        self.assertIs(self.obj.hunger_level, self.stages.PECKISH)
+        self.assertFalse(self.obj.hunger_free_pass_tick)
+        self.assertIs(self.obj.thirst_level, self.best.shifted(-1))
+
+    def test_mx_13_a_pre_tick_hook_returning_false_cancels(self):
+        """MX-13"""
+        from evennia import create_object
+
+        guarded = create_object(
+            "tests.game_typeclasses.GuardedSurvivalStub", key="refuser"
+        )
+
+        survival_tick(guarded)
+
+        self.assertIs(guarded.hunger_level, self.best)
+        self.assertIs(guarded.thirst_level, self.best)
+
+    def test_mx_14_the_post_tick_hook_sees_the_new_stages(self):
+        """MX-14"""
+        from evennia import create_object
+
+        recorder = create_object(
+            "tests.game_typeclasses.RecordingSurvivalStub", key="recorder"
+        )
+
+        survival_tick(recorder)
+
+        self.assertEqual(
+            recorder.ndb.post_tick_saw,
+            (self.best.shifted(-1), self.best.shifted(-1)),
+        )
+
+    def test_mx_15_the_regeneration_hook_defaults_to_doing_nothing(self):
+        """MX-15"""
+        # The library never calls this — a consumer's clock does, once there
+        # is one. What is ours is that it exists with both meters in its
+        # signature, so a holder overriding nothing is ticked rather than
+        # raising.
+        result = self.obj.at_regeneration_tick(
+            self.obj.hunger_level, self.obj.thirst_level
+        )
+
+        self.assertIsNone(result)
+        self.assertIs(self.obj.hunger_level, self.best)
+        self.assertIs(self.obj.thirst_level, self.best)

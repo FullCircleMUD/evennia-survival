@@ -54,6 +54,12 @@ SURVIVAL_THIRST_STAGES = "tests.stage_stubs.HungerStageStub"
 SURVIVAL_METER_INTERVAL = 1200
 SURVIVAL_REGEN_INTERVAL = 20
 
+# This suite has no world, so an object created in it has nowhere to call home.
+# Evennia's default points at #2 (Limbo), which nothing here builds — leaving it
+# set makes every created object carry a foreign key to a row that does not
+# exist, and SQLite reports it when the test transaction closes.
+DEFAULT_HOME = None
+
 # Required Django bits
 SECRET_KEY = "test-only-secret"
 TEST_ENVIRONMENT = True

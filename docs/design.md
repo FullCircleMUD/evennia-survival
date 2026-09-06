@@ -11,7 +11,7 @@ The library holds **meters and clocks**. The game holds **everything a meter mea
 
 | The library | The consumer |
 |---|---|
-| Meter state on a character, and the rules for moving it | The stages themselves — how many, their names, their messages |
+| Meter state on a holder, and the rules for moving it | The stages themselves — how many, their names, their messages |
 | The clocks, and the walk over characters they tick | What a tick does — heal, halt, bleed, die |
 | `eat` and `drink`, and the meter rules behind them | What is edible, where it comes from, how it is removed |
 | The drink-container primitive | What a container is in the game, and how its state is stored |
@@ -75,49 +75,63 @@ chosen it. Each must be a positive integer — `"1200"` and `1200.0` are refused
 write and none to guess at, and zero is refused separately from the type because it is a perfectly good
 integer that gives a clock which never fires.
 
-Both are library-owned scripts sharing one walk over characters: those with an active session, carrying
-the mixin, minus superusers. Doing that walk correctly under a game running as more than one process is
-the fiddly part, and we would rather write it once than have a consumer write the second half of it.
+Both clocks walk the same set — everything carrying the mixin — and call one thing on each. Neither
+knows what it is looking at, so a pet with meters is reached on the same terms as a player with them.
 
 #### A meter tick, step by step
 
 - **[library]** the meter clock fires
-- **[library]** each character with the mixin and an active session is visited
-- **[library]** a pending free pass is consumed instead of stepping the meter, if one is set
-- **[library]** otherwise the meter steps down one stage, stopping at the last one
-- **[library]** crossing into a new stage emits that stage's message
-- **[gap]** none of this is built
+- **[gap]** the holders carrying the mixin are gathered — how, is undecided
+- **[consumer]** `at_pre_survival_tick()` answers whether this holder ticks at all; `False` cancels
+- **[library]** a pending free pass is spent instead of stepping that meter, if one is set
+- **[library]** otherwise the meter steps one stage worse, stopping at the last one
+- **[consumer]** `at_post_survival_tick()` runs, with the meters already moved
 
-### Consequences, without the library knowing what a character is
+Everything but the gathering is built: `survival_tick(holder)` in `services.py`, and the two hooks on
+the mixin.
 
-The library does not touch hit points, does not compute damage, and does not kill anything. It cannot:
-healing rates depend on posture and location, and death means corpses and loot, all of which are the
-game's.
+### The tick is the library; the consequences are the game's
 
-So the regen clock does exactly one thing — it calls a hook with the current meter states:
+The ticking that decrements hunger and thirst is what this library is for. It is not an extension
+point, which is why the body sits in `services.py` rather than on the holder where a consumer could
+override it.
+
+What the library will not do is act on the result. It touches no hit points, computes no damage and
+kills nothing — healing rates depend on posture and location, and death means corpses and loot, all of
+which are the game's. So the regeneration clock has no body at all. It calls one hook:
 
 ```python
-def at_survival_tick(self, hunger, thirst):
+def at_regeneration_tick(self, hunger, thirst):
     ...
 ```
 
-Everything the game wants to do about being hungry lives in that method: which stage halts healing,
-which stage starts bleeding, how fast, and what happens at zero. The library's contribution is that the
-method gets called reliably, on the right characters, with current state.
+Everything a game wants to do about being hungry lives in that method: which stage halts healing, which
+starts bleeding, how fast, what happens at zero, and whatever guard decides this holder should be
+skipped. The library's contribution is that it gets called reliably, with current state.
 
-This is why there is no setting naming a health attribute, and no cycles-to-death table in the library.
-Both would be the library holding half a decision.
+This is why there is no setting naming a health attribute and no cycles-to-death table here. Both would
+be the library holding half a decision.
+
+**Two hooks bracket the survival tick and one stands alone at the regeneration tick.** The survival
+tick has a body of ours worth bracketing; the regeneration tick has none, so a pre and a post would sit
+either side of nothing.
 
 ### Moving a meter from outside
 
 Spells, curses, traps and food all need to move a meter, so the mixin exposes it directly:
 
 ```python
-character.restore_hunger(levels, free_pass=False)
-character.increase_hunger(levels)
-character.restore_thirst(levels, free_pass=False)
-character.increase_thirst(levels)
+holder.restore_hunger(stages, free_pass=False)
+holder.increase_hunger(stages)
+holder.restore_thirst(stages, free_pass=False)
+holder.increase_thirst(stages)
+holder.reset_survival_meters()
 ```
+
+**Nothing here assumes a character.** The mixin carries meters; what it is attached to is the
+consumer's business, and a pet with meters is as valid as a player with them. `reset_survival_meters()`
+exists because a consumer cannot write it themselves — which stage is the best one is theirs to declare
+and ours to resolve.
 
 Four named methods over one signed internal, so the clamping is written once but a caller cannot
 reverse the direction by passing a negative number.

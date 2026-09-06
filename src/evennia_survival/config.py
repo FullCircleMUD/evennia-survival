@@ -103,6 +103,34 @@ def check_settings() -> None:
         ) from cause
 
 
+def get_hunger_stages():
+    """Return the consumer's hunger stage enum. Checked at boot."""
+    from django.conf import settings
+
+    return import_string(settings.SURVIVAL_HUNGER_STAGES)
+
+
+def get_thirst_stages():
+    """Return the consumer's thirst stage enum. Checked at boot."""
+    from django.conf import settings
+
+    return import_string(settings.SURVIVAL_THIRST_STAGES)
+
+
+def get_meter_interval() -> int:
+    """Return ``SURVIVAL_METER_INTERVAL`` in seconds. Checked at boot."""
+    from django.conf import settings
+
+    return settings.SURVIVAL_METER_INTERVAL
+
+
+def get_regen_interval() -> int:
+    """Return ``SURVIVAL_REGEN_INTERVAL`` in seconds. Checked at boot."""
+    from django.conf import settings
+
+    return settings.SURVIVAL_REGEN_INTERVAL
+
+
 def _problems_with(setting_name: str, path: str, stages) -> list:
     """Return everything wrong with one meter's declared stages.
 

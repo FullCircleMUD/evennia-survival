@@ -21,11 +21,13 @@ For the design wiki, read [docs/INDEX.md](docs/INDEX.md).
 
 ## Project status
 
-**A game can be configured, and is refused if it is configured wrongly. Nothing ticks yet.** A consumer
-declares their stages and the two clock intervals, and boot validates all four settings. Nothing reads
-them after that — the meters, the clocks and the commands are still in FCM. See
+**Meters work; no clock drives them yet.** A consumer declares their stages and intervals, adds
+`SurvivalMixin` to whatever should get hungry, and can move the meters from their own code. The tick
+body exists and does the right thing to one holder. What is missing is the clocks, and the decision
+about how they gather the holders to tick — see the `[TBD]` in
+[docs/test-plan.md](docs/test-plan.md). The commands and the drink container are still in FCM. See
 [docs/progress.md](docs/progress.md), and [docs/installing.md](docs/installing.md) for what a consumer
-declares today.
+does today.
 
 ## Where to read first
 
@@ -124,17 +126,24 @@ evennia-survival/
 │   └── evennia_survival/      # library code (src layout)
 │       ├── __init__.py
 │       ├── apps.py            # AppConfig — ready() runs the boot check
-│       ├── config.py          # the settings, and check_settings()
+│       ├── config.py          # the settings, check_settings(), the accessors
 │       ├── stages.py          # SurvivalStage — the base a consumer subclasses
+│       ├── mixins.py          # SurvivalMixin — the meters and the hooks
+│       ├── services.py        # the tick body; not a method on the holder
 │       ├── log.py             # shim onto Evennia's logger → survival.log
 │       └── tests.py           # unit tests, run via runtests.py
 └── tests/                     # standalone test infrastructure
     ├── __init__.py
     ├── test_settings.py
     ├── stage_stubs.py         # stage enums; imports nothing but the library
+    ├── game_typeclasses.py    # real typeclasses carrying the mixin
     ├── raising_stage_module.py
     └── urls.py
 ```
+
+**The tick body is in `services.py`, not on the mixin.** The ticking that decrements the meters is what
+the library is for and is not an extension point, so it does not live somewhere a consumer can override
+it. The mixin carries the hooks into it. Do not "tidy" it onto the holder.
 
 No `contrib/` — nothing opt-in exists, and the standards forbid scaffolding one empty.
 
