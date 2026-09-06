@@ -1,13 +1,12 @@
 # evennia-survival
 
-Hunger, thirst and regeneration meters for Evennia characters — meters that deplete on a shared tick,
-and a regeneration pipeline that reads them.
+Hunger and thirst meters for Evennia — they deplete on a clock, and a second clock hands them to your
+game so it can decide what being hungry does.
 
 ## Status
 
-**Characters and mobs get hungry on a clock.** Declare your stages, add the mixin to whatever should
-get hungry, start the clock, and the meters run. What being hungry *does* — the regeneration half — is
-the next piece. See
+**Working, untried against a real game.** Declare your stages, add the mixin to whatever should get
+hungry, start the two clocks, and answer one hook to say what being hungry does. See
 [docs/progress.md](https://github.com/FullCircleMUD/evennia-survival/blob/main/docs/progress.md).
 
 ## The problem it solves

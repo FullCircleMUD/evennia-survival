@@ -2,6 +2,27 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-06 — the regeneration clock, and the library does what it set out to
+
+61 tests, all passing. Both clocks run. Nine cases, `RS-01` to `RS-09`.
+
+- **A second `LoopingCall`, independent of the meter clock.** Its own interval, its own module
+  reference, and stopping one leaves the other running — `RS-09` pins that, because a shared reference
+  is the obvious mistake and it would kill both.
+- **The same gathering.** `survival_holders()` unchanged: puppeted characters plus tagged holders. The
+  fast clock reaches the tagged half too, so a pet left parked for three hours is weak or dead when its
+  owner comes back.
+- **No pre-hook.** The library has no body here to cancel — it hands over both meters and gets out of
+  the way — so whatever guard a consumer wants is the first line of their own method.
+- **The same two guards**, and the per-holder one matters more here than in the meter pass: this is
+  where consumer code actually runs, so a broken `at_regeneration_tick` is the realistic failure.
+
+Also fixed: the clocks are module state, and a test leaving one running wedged every later one — the
+next start saw a live clock and handed back the stale reference. Found because an `SS` case failed for
+an `RS` reason.
+
+That is the library complete against what it set out to do. Untried against a real game.
+
 ## 2026-09-06 — the meter clock, and who it reaches
 
 52 tests, all passing. Characters and mobs now get hungry on a timer. Fourteen cases, `MX-16` to

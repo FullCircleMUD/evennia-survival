@@ -1,8 +1,7 @@
 # Installing
 
-What a game has to do to run this library. **A working note, not a finished guide** — it is written as
-each requirement is decided, so it stays honest about what exists rather than being reconstructed from
-memory once everything is built. Sections appear as the machinery does.
+What a game has to do to run this library. Written as each requirement was decided rather than
+reconstructed afterwards, so it describes what exists.
 
 Everything here is enforced at boot: a game that gets any of it wrong does not start, and is told all
 of what is wrong at once rather than one thing per restart.
@@ -112,31 +111,40 @@ def at_regeneration_tick(self, hunger, thirst):
     """Everything that being this hungry and this thirsty does. Yours entirely."""
 ```
 
-**`at_pre_survival_tick` is the only guard there is, and writing it is your job.** A clock reaches
-every holder of the mixin, which is not the same set as the holders that ought to be ticking — a
-logged-out character and a stabled pet both still carry meters. The default permits the tick, so a
-class that overrides nothing works; a game whose holders are not all meant to tick has to say so here,
-and nothing else will say it on your behalf.
+**`at_pre_survival_tick` is the only guard there is.** A logged-out character is already skipped —
+they are reached through their session, and there is no session. What it is for is the holder that is
+found but should sit this one out: a stabled pet, an idle mob. The default permits the tick, so a
+class that overrides nothing works, and nothing will write that guard on your behalf.
 
 **`at_regeneration_tick` is where the game happens.** The library reads no hit points, computes no
 damage and kills nothing, because healing rates depend on posture and location and death means corpses
 and loot. It hands you both meters on a clock and gets out of the way. Whatever guard you want is the
 first line of your own method — there is no pre-hook here, because there is nothing of ours to cancel.
 
-## 8. Start the clock
+## 8. Start the clocks
 
 ```python
 # server/conf/at_server_startstop.py
-from evennia_survival.services import start_survival_clock, stop_survival_clock
+from evennia_survival.services import (
+    start_regeneration_clock,
+    start_survival_clock,
+    stop_regeneration_clock,
+    stop_survival_clock,
+)
 
 
 def at_server_start():
     start_survival_clock()
+    start_regeneration_clock()
 
 
 def at_server_stop():
     stop_survival_clock()
+    stop_regeneration_clock()
 ```
+
+Two independent clocks. The meter one steps everyone's hunger and thirst; the regeneration one hands
+both meters to `at_regeneration_tick` and does nothing else. Stopping one leaves the other running.
 
 Not from `AppConfig.ready()` — that also runs during `evennia migrate` and management commands, where
 a clock should not be spinning up. Starting twice is a no-op, so the reload that runs `at_server_start`
@@ -154,12 +162,13 @@ calling `super()` never gets tagged, and its holders silently never tick.
 `survival.log`, beside `server.log` in your `LOG_DIR`. It stays silent unless something is wrong, so
 anything in it is worth reading. Four kinds of line and no others:
 
-- the clock started, and at what interval
-- the clock stopped
+- a clock started, and at what interval
+- a clock stopped
 - a tick raised on a named holder — with the traceback, and the walk carried on to everyone else
-- the pass itself raised
+- a pass itself raised
 
-A hook of yours that raises lands in the third of those, named, rather than stopping the clock.
+A hook of yours that raises lands in the third of those, named, rather than stopping the clock. That
+matters most for `at_regeneration_tick`, since it is the one running your code on the fast interval.
 
 ## Feeding and watering are yours
 
@@ -168,8 +177,7 @@ game feeds anyone or how it manages it — call `restore_hunger()` or `restore_t
 command, spell or item you already have. See
 [design.md](design.md) § Out of scope for why the seam sits there.
 
-## Still to come
+## That is all of it
 
-Not built yet. Listed so the shape of the finished install is visible:
-
-- The regeneration clock. `at_regeneration_tick` exists and nothing calls it yet.
+Everything the library does is above. Declare your stages, add the mixin, start the two clocks, and
+answer the hooks.

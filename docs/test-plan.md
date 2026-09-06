@@ -20,6 +20,7 @@ Behaviour is agreed here first, before any test or code — see
 | `CF` | Settings, and the boot check that refuses a configuration the library cannot work with |
 | `MX` | `SurvivalMixin` — the meters an object carries, and the methods that move them |
 | `SS` | The survival service — the clock that steps every holder's meters, and its logging |
+| `RS` | The regeneration service — the clock that hands both meters to the consumer |
 
 ## Fixtures
 
@@ -35,10 +36,18 @@ The fake objects the suite needs, named and purposed.
 | `NotAStage` | A plain class, for a setting pointing at something that is not a stage enum. `CF-04` |
 | `tests/raising_stage_module.py` | A consumer's stage module that fails on import. It lives outside `tests.py` because importing it raises, which is the point. `CF-10` |
 | `tests/game_typeclasses.py` | A real Evennia typeclass carrying `SurvivalMixin`. `AttributeProperty` needs an object with an attribute handler behind it, so the `MX` cases create one rather than faking it. Imports Evennia, so it is imported inside a test body and never named in settings |
-| `RaisingSurvivalStub` | A holder whose hook raises, standing in for a consumer with a bug in theirs. `SS-04` |
+| `SurvivalObjectStub` | The plain holder — the mixin on a `DefaultObject`, deliberately not a character, so "a pet can carry this" is what the suite exercises rather than what the docs claim. Most `MX` cases |
 | `PlayerCharacterStub` | A holder declaring `survival_is_player_character = True`, so it is not tagged. `MX-17` |
 | `PlayerCharacterSubclassStub` | A subclass of it declaring nothing of its own, so the flag has to be inherited. `MX-18` |
-| `twisted.internet.task.Clock` | Drives the loop without a reactor, so the `SS` cases advance time rather than waiting for it. The library takes a `clock` argument for this and production leaves it alone — the same seam `evennia-message-bus` uses |
+| `RecordingSurvivalStub` | Records what its hooks were handed. `MX-14`, and the regeneration cases that need to see a holder was reached |
+| `RecordingPlayerCharacterStub` | The same, on a player character, so `RS-01` can prove both passes ran rather than one twice |
+| `GuardedSurvivalStub` | A guard returning `False`. `MX-13` |
+| `NoneGuardStub` | A guard written as a bare `return`, which yields `None`. Falsy cancels, per Evennia's convention. `SS-11` |
+| `RaisingSurvivalStub` | A holder whose survival guard raises, standing in for a consumer with a bug. `SS-04` |
+| `RaisingRegenStub` | The same for the regeneration hook, which is where consumer code actually runs. `RS-02` |
+| `CountingRegenStub` | Counts the ticks it receives, so a second loop shows up as two. `RS-05` |
+| `_FakeSession` | A session as the character pass sees it: something with a puppet. Declared in `tests.py`, since the pass only ever calls `get_puppet()` |
+| `twisted.internet.task.Clock` | Drives the loops without a reactor, so the `SS` and `RS` cases advance time rather than waiting for it. Both starters take a `clock` argument for this and production leaves it alone — the same seam `evennia-message-bus` uses |
 
 ## Cases
 
@@ -270,6 +279,32 @@ reboot.
 | SS-09 | Starting and stopping each write one `survival.log` line | test_ss_09_starting_and_stopping_each_write_one_line |
 | SS-10 | A tick with nothing wrong writes no `survival.log` line | test_ss_10_a_clean_tick_writes_no_log_line |
 | SS-11 | A guard hook returning `None` cancels the tick, as `False` does | test_ss_11_a_guard_returning_none_cancels_the_tick |
+
+### RS — the regeneration service
+
+The second clock. It gathers the same way the survival service does — the same two passes over the
+same holders — and then does nothing of its own: it hands each holder both meters and gets out of the
+way. Gathering is shared code, so the `SS` cases cover it and these do not repeat it.
+
+**Both passes, not the character pass only.** Puppeted characters and tagged holders, exactly as the
+survival service gathers them. A pet left parked for three hours should be weak or dead when its owner
+comes back, and that only happens if the fast clock reaches the tagged half too. Whether a particular
+holder should then be skipped — a stabled pet, an idle mob — is answered in the consumer's own hook.
+
+**No pre-hook, because there is nothing of ours to cancel.** The survival tick has a body worth
+bracketing; this one is a single call into consumer code.
+
+| ID | Case | Test function |
+|---|---|---|
+| RS-01 | A puppeted character and a tagged holder both get their regeneration hook called, with both meters at their current stage | test_rs_01_both_passes_reach_their_holders_with_current_meters |
+| RS-02 | A holder whose hook raises is named in a `survival.log` line, and the walk carries on to the rest | test_rs_02_a_holder_that_raises_is_logged_and_the_walk_carries_on |
+| RS-03 | Nothing raised inside the walk reaches the loop, which keeps running | test_rs_03_nothing_raised_inside_the_walk_reaches_the_loop |
+| RS-04 | Starting runs the pass on the configured regeneration interval | test_rs_04_starting_runs_the_pass_on_the_regeneration_interval |
+| RS-05 | Starting a second time does not leave two loops running | test_rs_05_starting_twice_does_not_leave_two_loops |
+| RS-06 | Stopping stops the loop | test_rs_06_stopping_stops_the_loop |
+| RS-07 | Starting and stopping each write one `survival.log` line | test_rs_07_starting_and_stopping_each_write_one_line |
+| RS-08 | A pass with nothing wrong writes no `survival.log` line | test_rs_08_a_clean_pass_writes_no_log_line |
+| RS-09 | The two clocks are independent — stopping one leaves the other running | test_rs_09_the_two_clocks_are_independent |
 
 ## Open decisions
 

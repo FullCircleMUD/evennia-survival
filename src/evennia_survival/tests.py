@@ -12,6 +12,7 @@ from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 
 import evennia_survival
+from evennia_survival import services
 from evennia_survival.config import (
     PROBLEM_PREFIX,
     SETTING_HUNGER_STAGES,
@@ -22,9 +23,13 @@ from evennia_survival.config import (
 )
 from evennia_survival.log import survival_log
 from evennia_survival.mixins import SURVIVAL_TAG, SURVIVAL_TAG_CATEGORY
-from evennia_survival.config import get_meter_interval
+from evennia_survival.config import get_meter_interval, get_regen_interval
 from evennia_survival.services import (
+    guarded_regeneration_pass,
     guarded_survival_pass,
+    run_regeneration_pass,
+    start_regeneration_clock,
+    stop_regeneration_clock,
     run_survival_pass,
     start_survival_clock,
     stop_survival_clock,
@@ -441,6 +446,16 @@ class SurvivalServiceTests(DjangoTestCase):
         self.best = HungerStageStub.FULL
         self.create = create_object
 
+    def tearDown(self):
+        # The clocks are module state, so a test that leaves one running
+        # wedges every later one: the next start sees a live clock and hands
+        # back the stale reference instead of building a new one.
+        for name in ("_clock", "_regen_clock"):
+            running = getattr(services, name, None)
+            if running is not None and running.running:
+                running.stop()
+            setattr(services, name, None)
+
     def _sessions_of(self, *puppets):
         """Patch the session handler so the character pass sees these."""
         handler = mock.Mock()
@@ -573,3 +588,160 @@ class SurvivalServiceTests(DjangoTestCase):
         survival_tick(guarded)
 
         self.assertIs(guarded.hunger_level, self.best)
+
+
+class RegenerationServiceTests(DjangoTestCase):
+    """RS — the clock that hands both meters to the consumer."""
+
+    def setUp(self):
+        from evennia import create_object
+
+        from tests.stage_stubs import HungerStageStub
+
+        self.best = HungerStageStub.FULL
+        self.stages = HungerStageStub
+        self.create = create_object
+
+    def tearDown(self):
+        # The clocks are module state, so a test that leaves one running
+        # wedges every later one: the next start sees a live clock and hands
+        # back the stale reference instead of building a new one.
+        for name in ("_clock", "_regen_clock"):
+            running = getattr(services, name, None)
+            if running is not None and running.running:
+                running.stop()
+            setattr(services, name, None)
+
+    def _sessions_of(self, *puppets):
+        handler = mock.Mock()
+        handler.get_sessions.return_value = [_FakeSession(p) for p in puppets]
+        return mock.patch("evennia.SESSION_HANDLER", handler)
+
+    def test_rs_01_both_passes_reach_their_holders_with_current_meters(self):
+        """RS-01"""
+        played = self.create(
+            "tests.game_typeclasses.RecordingPlayerCharacterStub", key="played"
+        )
+        mob = self.create("tests.game_typeclasses.RecordingSurvivalStub", key="mob")
+        mob.increase_hunger(2)
+
+        with self._sessions_of(played):
+            run_regeneration_pass()
+
+        self.assertEqual(played.ndb.regen_tick_saw, (self.best, self.best))
+        self.assertEqual(mob.ndb.regen_tick_saw, (self.stages.HUNGRY, self.best))
+
+    def test_rs_02_a_holder_that_raises_is_logged_and_the_walk_carries_on(self):
+        """RS-02"""
+        self.create("tests.game_typeclasses.RaisingRegenStub", key="broken")
+        healthy = self.create(
+            "tests.game_typeclasses.RecordingSurvivalStub", key="fine"
+        )
+
+        with self._sessions_of():
+            with mock.patch("evennia_survival.services.survival_log") as logged:
+                run_regeneration_pass()
+
+        self.assertIsNotNone(healthy.ndb.regen_tick_saw)
+        self.assertTrue(
+            any("broken" in str(call) for call in logged.call_args_list),
+            "the failing holder should be named in survival.log",
+        )
+
+    def test_rs_03_nothing_raised_inside_the_walk_reaches_the_loop(self):
+        """RS-03"""
+        with mock.patch(
+            "evennia_survival.services.run_regeneration_pass",
+            side_effect=RuntimeError("boom"),
+        ):
+            with mock.patch("evennia_survival.services.survival_log"):
+                guarded_regeneration_pass()  # must not raise
+
+    def test_rs_04_starting_runs_the_pass_on_the_regeneration_interval(self):
+        """RS-04"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+        mob = self.create("tests.game_typeclasses.RecordingSurvivalStub", key="mob")
+
+        with self._sessions_of():
+            start_regeneration_clock(clock=clock)
+            try:
+                clock.advance(get_regen_interval())
+            finally:
+                stop_regeneration_clock()
+
+        self.assertIsNotNone(mob.ndb.regen_tick_saw)
+
+    def test_rs_05_starting_twice_does_not_leave_two_loops(self):
+        """RS-05"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+        mob = self.create("tests.game_typeclasses.CountingRegenStub", key="mob")
+
+        with self._sessions_of():
+            start_regeneration_clock(clock=clock)
+            start_regeneration_clock(clock=clock)
+            try:
+                clock.advance(get_regen_interval())
+            finally:
+                stop_regeneration_clock()
+
+        self.assertEqual(mob.ndb.regen_tick_count, 1)
+
+    def test_rs_06_stopping_stops_the_loop(self):
+        """RS-06"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+        mob = self.create("tests.game_typeclasses.RecordingSurvivalStub", key="mob")
+
+        with self._sessions_of():
+            start_regeneration_clock(clock=clock)
+            stop_regeneration_clock()
+            clock.advance(get_regen_interval() * 3)
+
+        self.assertIsNone(mob.ndb.regen_tick_saw)
+
+    def test_rs_07_starting_and_stopping_each_write_one_line(self):
+        """RS-07"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+
+        with mock.patch("evennia_survival.services.survival_log") as logged:
+            start_regeneration_clock(clock=clock)
+            stop_regeneration_clock()
+
+        self.assertEqual(logged.call_count, 2)
+
+    def test_rs_08_a_clean_pass_writes_no_log_line(self):
+        """RS-08"""
+        self.create("tests.game_typeclasses.RecordingSurvivalStub", key="mob")
+
+        with self._sessions_of():
+            with mock.patch("evennia_survival.services.survival_log") as logged:
+                run_regeneration_pass()
+
+        self.assertEqual(logged.call_count, 0)
+
+    def test_rs_09_the_two_clocks_are_independent(self):
+        """RS-09"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+        mob = self.create("tests.game_typeclasses.RecordingSurvivalStub", key="mob")
+
+        with self._sessions_of():
+            start_survival_clock(clock=clock)
+            start_regeneration_clock(clock=clock)
+            stop_regeneration_clock()
+            try:
+                clock.advance(get_meter_interval())
+            finally:
+                stop_survival_clock()
+
+        # The meter clock survived its sibling being stopped.
+        self.assertIs(mob.hunger_level, self.best.shifted(-1))
+        self.assertIsNone(mob.ndb.regen_tick_saw)

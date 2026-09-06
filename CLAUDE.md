@@ -9,24 +9,23 @@ Instructions for Claude (and other LLM agents) working in this repository.
 
 ## What this project is
 
-`evennia-survival` gives [Evennia](https://www.evennia.com/) characters upkeep meters — hunger and
-thirst — that deplete on a shared tick, and the regeneration pipeline that reads them to decide whether
-a character heals, stalls, or bleeds. Tagline: **"Hunger, thirst and regeneration for Evennia."**
+`evennia-survival` gives [Evennia](https://www.evennia.com/) objects upkeep meters — hunger and
+thirst — that deplete on a clock, and a second clock that hands both meters to the game so it can
+decide what being hungry does. Tagline: **"Hunger, thirst and regeneration for Evennia."**
 
-The machinery exists already, inside FullCircleMUD, and this library is where it is being extracted
-to. Nothing has moved yet.
+FullCircleMUD is the intended first consumer and has its own working version of this, described in
+its `design/survival-system.md`. Nothing has been taken from it wholesale.
 
 For the big-picture overview, read [README.md](README.md).
 For the design wiki, read [docs/INDEX.md](docs/INDEX.md).
 
 ## Project status
 
-**Characters and mobs get hungry on a clock. The regeneration half is not built.** A consumer declares
-their stages and intervals, adds `SurvivalMixin`, and starts the meter clock from `at_server_start()`.
-`at_regeneration_tick` exists on the mixin and nothing calls it yet — that clock is the next piece.
-Eating, drinking and containers are out of scope: the library decides nothing about what a game feeds
-anyone. See [docs/progress.md](docs/progress.md), and [docs/installing.md](docs/installing.md) for what
-a consumer does today.
+**Complete against what it set out to do.** A consumer declares their stages and intervals, adds
+`SurvivalMixin` to whatever should get hungry, starts the two clocks, and answers the hooks. Meters
+tick and the consequences are handed back on the fast clock. Untried against a real game. Eating,
+drinking and containers are out of scope: the library decides nothing about what a game feeds anyone.
+See [docs/progress.md](docs/progress.md) and [docs/installing.md](docs/installing.md).
 
 ## Where to read first
 
@@ -56,9 +55,8 @@ Every implementation decision must respect them.
    code. See [test-first-process.md](../../design/test-first-process.md) for the process and the
    rationale.
 
-`[TBD — needs discussion: where exactly the mechanism/content line falls, and therefore which of the
-extracted pieces are library and which stay in FCM. Drawing that line is the first task of the
-extraction. Do not settle it by writing code.]`
+The mechanism/content line is drawn: meters and clocks here, everything a meter *means* in the game.
+See *Out of scope* below.
 
 ## Out of scope
 

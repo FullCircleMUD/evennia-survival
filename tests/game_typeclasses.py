@@ -28,6 +28,27 @@ class PlayerCharacterSubclassStub(PlayerCharacterStub):
     """Declares nothing of its own — MX-18 checks it inherits the flag."""
 
 
+class RecordingPlayerCharacterStub(PlayerCharacterStub):
+    """A player character that records what its regeneration hook saw. RS-01."""
+
+    def at_regeneration_tick(self, hunger, thirst):
+        self.ndb.regen_tick_saw = (hunger, thirst)
+
+
+class RaisingRegenStub(SurvivalObjectStub):
+    """A holder whose regeneration hook raises — a consumer with a bug. RS-02."""
+
+    def at_regeneration_tick(self, hunger, thirst):
+        raise RuntimeError("deliberate failure in a consumer hook")
+
+
+class CountingRegenStub(SurvivalObjectStub):
+    """Counts regeneration ticks, so a second loop would show up. RS-05."""
+
+    def at_regeneration_tick(self, hunger, thirst):
+        self.ndb.regen_tick_count = (self.ndb.regen_tick_count or 0) + 1
+
+
 class NoneGuardStub(SurvivalObjectStub):
     """A guard written the way most people write one — a bare ``return``.
 

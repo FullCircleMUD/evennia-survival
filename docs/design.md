@@ -125,6 +125,18 @@ be the library holding half a decision.
 tick has a body of ours worth bracketing; the regeneration tick has none, so a pre and a post would sit
 either side of nothing.
 
+#### A regeneration tick, step by step
+
+- **[library]** the regeneration clock fires
+- **[library]** the same holders are gathered as for a meter tick — sessions, then the tag
+- **[consumer]** `at_regeneration_tick(hunger, thirst)` does whatever being this hungry means
+- **[library]** anything raised is caught per holder, named in `survival.log`, and the walk carries on
+
+Both clocks reach the tagged holders, not only the puppeted ones. A pet left parked for three hours
+should be weak or dead when its owner comes back, and that only happens if the fast clock reaches it.
+
+No gaps: this part is built.
+
 ### Moving a meter from outside
 
 Spells, curses, traps and food all need to move a meter, so the mixin exposes it directly:
