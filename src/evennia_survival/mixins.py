@@ -45,14 +45,40 @@ def _default_thirst_name() -> str:
     return _best(get_thirst_stages()).name
 
 
+#: The tag a non-player-character holder carries, and how the clock finds it.
+#: Shared so the mixin that writes it and the service that queries it cannot
+#: drift apart.
+SURVIVAL_TAG = "survival"
+SURVIVAL_TAG_CATEGORY = "survival"
+
+
 class SurvivalMixin:
     """Two meters, the free-pass flag behind each, and the ways to move them."""
+
+    #: Declared ``True`` on a typeclass a player puppets. Those are reached
+    #: through their session, so they are not tagged — a tag on them would
+    #: only be something to exclude again. A class attribute rather than
+    #: stored state, so subclasses inherit it.
+    survival_is_player_character = False
 
     _hunger_stage = AttributeProperty(default=_default_hunger_name, strattr=True)
     _thirst_stage = AttributeProperty(default=_default_thirst_name, strattr=True)
 
     hunger_free_pass_tick = AttributeProperty(False)
     thirst_free_pass_tick = AttributeProperty(False)
+
+    def at_object_creation(self):
+        """Tag this holder so a clock can find it, unless a player puppets it.
+
+        Player characters are reached through their session instead, so a tag
+        on them would only be something to exclude again.
+
+        **A consumer typeclass overriding this hook must call ``super()``**, or
+        its holders are never tagged and never tick.
+        """
+        super().at_object_creation()
+        if not self.survival_is_player_character:
+            self.tags.add(SURVIVAL_TAG, category=SURVIVAL_TAG_CATEGORY)
 
     @property
     def hunger_level(self):

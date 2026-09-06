@@ -21,13 +21,12 @@ For the design wiki, read [docs/INDEX.md](docs/INDEX.md).
 
 ## Project status
 
-**Meters work; no clock drives them yet.** A consumer declares their stages and intervals, adds
-`SurvivalMixin` to whatever should get hungry, and can move the meters from their own code. The tick
-body exists and does the right thing to one holder. What is missing is the clocks, and the decision
-about how they gather the holders to tick — see the `[TBD]` in
-[docs/test-plan.md](docs/test-plan.md). The commands and the drink container are still in FCM. See
-[docs/progress.md](docs/progress.md), and [docs/installing.md](docs/installing.md) for what a consumer
-does today.
+**Characters and mobs get hungry on a clock. The regeneration half is not built.** A consumer declares
+their stages and intervals, adds `SurvivalMixin`, and starts the meter clock from `at_server_start()`.
+`at_regeneration_tick` exists on the mixin and nothing calls it yet — that clock is the next piece.
+Eating, drinking and containers are out of scope: the library decides nothing about what a game feeds
+anyone. See [docs/progress.md](docs/progress.md), and [docs/installing.md](docs/installing.md) for what
+a consumer does today.
 
 ## Where to read first
 
@@ -63,9 +62,13 @@ extraction. Do not settle it by writing code.]`
 
 ## Out of scope
 
-Decided as questions arise — the library is too young for a settled list. Rulings so far:
+Decided as questions arise. Rulings so far:
 
-- **The library owns no tables.** The meters are state on a character, which belongs to the consumer's
+- **Eating, drinking, food and drink containers.** The library decides nothing about what a game feeds
+  anyone or how it manages it. No `eat`, no `drink`, no container — a game calls `restore_hunger()`
+  from whatever it already has. Full reasoning in [docs/design.md](docs/design.md) § Out of scope; a
+  reference implementation, if ever wanted, goes in `contrib/` and never in core.
+- **The library owns no tables.** The meters are state on the holder, which belongs to the consumer's
   game database. No alias, no router, no migration for a consumer to configure. Revisit only if the
   library gains data of its own that must outlive a rebuild or be read from more than one instance.
 
@@ -144,6 +147,16 @@ evennia-survival/
 **The tick body is in `services.py`, not on the mixin.** The ticking that decrements the meters is what
 the library is for and is not an extension point, so it does not live somewhere a consumer can override
 it. The mixin carries the hooks into it. Do not "tidy" it onto the holder.
+
+**The clocks are Twisted `LoopingCall`s, not Evennia scripts** — nothing persistent to get stuck
+stopped. That makes the two guards in `run_survival_pass` and `guarded_survival_pass` load-bearing: an
+exception reaching a `LoopingCall` stops it, and the clock then goes quietly dead while the game looks
+healthy. The inner guard is per holder, so one consumer's broken hook does not end the tick for
+everyone behind them in the list.
+
+**Holders are found from sessions and from a tag, never from the idmapper cache.** The cache holds only
+what has been touched since boot, so a mob nobody has visited would never tick and then start when a
+player wandered past.
 
 No `contrib/` — nothing opt-in exists, and the standards forbid scaffolding one empty.
 

@@ -18,6 +18,34 @@ class SurvivalObjectStub(SurvivalMixin, DefaultObject):
     """Anything with meters. Deliberately not a character."""
 
 
+class PlayerCharacterStub(SurvivalObjectStub):
+    """A holder declaring itself a player character, so it is not tagged."""
+
+    survival_is_player_character = True
+
+
+class PlayerCharacterSubclassStub(PlayerCharacterStub):
+    """Declares nothing of its own — MX-18 checks it inherits the flag."""
+
+
+class NoneGuardStub(SurvivalObjectStub):
+    """A guard written the way most people write one — a bare ``return``.
+
+    It yields ``None`` rather than ``False``, and Evennia's convention is that
+    falsy cancels. SS-11.
+    """
+
+    def at_pre_survival_tick(self):
+        return
+
+
+class RaisingSurvivalStub(SurvivalObjectStub):
+    """A holder whose hook raises, standing in for a consumer with a bug."""
+
+    def at_pre_survival_tick(self):
+        raise RuntimeError("deliberate failure in a consumer hook")
+
+
 class GuardedSurvivalStub(SurvivalObjectStub):
     """A holder that refuses the tick, as a consumer's guard would.
 

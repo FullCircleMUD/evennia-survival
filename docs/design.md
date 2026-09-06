@@ -12,9 +12,8 @@ The library holds **meters and clocks**. The game holds **everything a meter mea
 | The library | The consumer |
 |---|---|
 | Meter state on a holder, and the rules for moving it | The stages themselves — how many, their names, their messages |
-| The clocks, and the walk over characters they tick | What a tick does — heal, halt, bleed, die |
-| `eat` and `drink`, and the meter rules behind them | What is edible, where it comes from, how it is removed |
-| The drink-container primitive | What a container is in the game, and how its state is stored |
+| The clocks, and the walk over the holders they tick | What a tick does — heal, halt, bleed, die |
+| Keeping those clocks running, and saying so when they stop | Eating, drinking, food, containers, and everything about them |
 
 Everything below follows from that split.
 
@@ -75,20 +74,30 @@ chosen it. Each must be a positive integer — `"1200"` and `1200.0` are refused
 write and none to guess at, and zero is refused separately from the type because it is a perfectly good
 integer that gives a clock which never fires.
 
-Both clocks walk the same set — everything carrying the mixin — and call one thing on each. Neither
-knows what it is looking at, so a pet with meters is reached on the same terms as a player with them.
+Each is a Twisted `LoopingCall`, not an Evennia script — nothing persistent to get stuck stopped, and
+recreated at every boot. Started from the consumer's `at_server_start()` rather than
+`AppConfig.ready()`, because `ready()` also runs during `evennia migrate` and management commands.
+
+**Holders are found two ways, because the two kinds are found differently.** Player characters come
+from their sessions: they move in and out of play, and a session is the only thing that says which are
+in it now. Everything else comes from a tag the mixin writes at creation — a mob is in the game whether
+or not anyone is near it, so it is found by an indexed query rather than by whatever happens to be in
+memory. The two sets cannot overlap, because a player character is never tagged.
+
+The idmapper cache is deliberately not used for this. It holds only what has been touched since boot,
+so a mob nobody has visited would never tick and then start when a player wandered past.
 
 #### A meter tick, step by step
 
 - **[library]** the meter clock fires
-- **[gap]** the holders carrying the mixin are gathered — how, is undecided
-- **[consumer]** `at_pre_survival_tick()` answers whether this holder ticks at all; `False` cancels
+- **[library]** puppeted holders are gathered from the sessions, tagged ones from a query
+- **[consumer]** `at_pre_survival_tick()` answers whether this holder ticks at all; anything falsy cancels
 - **[library]** a pending free pass is spent instead of stepping that meter, if one is set
 - **[library]** otherwise the meter steps one stage worse, stopping at the last one
 - **[consumer]** `at_post_survival_tick()` runs, with the meters already moved
+- **[library]** anything raised is caught per holder, named in `survival.log`, and the walk carries on
 
-Everything but the gathering is built: `survival_tick(holder)` in `services.py`, and the two hooks on
-the mixin.
+No gaps: this part is built.
 
 ### The tick is the library; the consequences are the game's
 
@@ -141,54 +150,32 @@ automatic because a game may well want some sources to grant it and others not �
 a game keeps a food economy from being bypassed by a spell, and the library should not decide it either
 way.
 
-The library's own `eat` and `drink` call these methods like anything else. There is no privileged path.
+## Out of scope — eating, drinking, and what a game feeds anyone
 
-### Eating, without the library knowing what food is
+**The library makes no decision about what a game eats or drinks, or how it manages any of it.** No
+`eat` command, no `drink` command, no food, no drink container. A game calls `restore_hunger()` from
+whatever it already has.
 
-`eat` belongs here — the sequencing and the meter rules are the same in every game. What is edible and
-how it disappears are not.
+The seam is there because that is where the library stopped being useful. Work through an `eat`
+command and it dissolves: the library cannot know what is edible, so that is a hook; it cannot know how
+a game removes what was eaten, so that is another hook; it cannot know what a mouthful is worth, so
+that comes back from the consumer too. What remains between the hooks is argument parsing and a call to
+a method the mixin already exposes. Shipping that would mean shipping a shape for eating that games
+then have to work around, in exchange for saving them three lines.
 
-Two hooks, and the order between them is the point:
+A drink container goes the same way. Strip a game's own answers to where the water came from, what the
+container is worth and how its state survives being traded, and what is left is an object with a number
+on it.
 
-```python
-def at_find_edible(self, target):     # -> something, or None
-def at_consume_edible(self, edible):  # -> how much it restored
-```
+**So the library does two things.** Whatever a consumer chooses gets hungrier and thirstier over time,
+through stages they define. And there is one hook where they define what those stages do to the thing
+carrying them.
 
-#### Eating, step by step
-
-- **[library]** `eat <target>` is parsed
-- **[consumer]** `at_find_edible` decides whether the character has that, and hands back whatever
-  represents it
-- **[library]** the meter is checked for room; a full character is told so and nothing is consumed
-- **[consumer]** `at_consume_edible` removes it however the game stores it, and reports what it is worth
-- **[library]** the meter steps up by that amount, capped
-- **[gap]** none of this is built
-
-Splitting find from consume is what lets the library refuse between them, so a full character does not
-waste food. Collapsing the two would lose that.
-
-Whatever `at_find_edible` returns is **opaque to the library** — it is handed straight back to
-`at_consume_edible` and never inspected. It can be an object, a string, an id, a row. This is what keeps
-the library out of any particular game's inventory model.
-
-`[TBD — needs discussion: the exact return shape of at_consume_edible, in particular how it reports
-whether a free pass applies.]`
-
-### Drinking
-
-Water is the easier half, because a container is genuinely an object with genuinely library-owned state
-— a capacity and a current level. A mixin makes an item drinkable; `drink` finds one carrying the mixin
-and steps thirst up; `refill` fills it.
-
-The one thing the library cannot assume is where that state is stored, since a game may need it to
-survive being banked, traded or exported. So changing `current` fires
-`at_water_state_changed()`, which writes an Evennia attribute by default and is where a game hangs its
-own persistence.
+If a reference implementation is ever wanted, `contrib/` is where it goes — opt-in, and clearly one
+answer rather than the answer. See the standards. Nothing goes in core.
 
 ## What is still open
 
-- The exact return shape of `at_consume_edible`, above.
 - Whether an out-of-band meter change emits the threshold message immediately, or leaves it to the next
   tick. Current leaning is to leave it to the tick.
 - The names of settings that do not exist yet are working names. The four that do — the two stage

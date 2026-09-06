@@ -19,6 +19,7 @@ Behaviour is agreed here first, before any test or code — see
 | `ST` | `SurvivalStage` — the base class a consumer subclasses to declare a meter's stages |
 | `CF` | Settings, and the boot check that refuses a configuration the library cannot work with |
 | `MX` | `SurvivalMixin` — the meters an object carries, and the methods that move them |
+| `SS` | The survival service — the clock that steps every holder's meters, and its logging |
 
 ## Fixtures
 
@@ -34,6 +35,10 @@ The fake objects the suite needs, named and purposed.
 | `NotAStage` | A plain class, for a setting pointing at something that is not a stage enum. `CF-04` |
 | `tests/raising_stage_module.py` | A consumer's stage module that fails on import. It lives outside `tests.py` because importing it raises, which is the point. `CF-10` |
 | `tests/game_typeclasses.py` | A real Evennia typeclass carrying `SurvivalMixin`. `AttributeProperty` needs an object with an attribute handler behind it, so the `MX` cases create one rather than faking it. Imports Evennia, so it is imported inside a test body and never named in settings |
+| `RaisingSurvivalStub` | A holder whose hook raises, standing in for a consumer with a bug in theirs. `SS-04` |
+| `PlayerCharacterStub` | A holder declaring `survival_is_player_character = True`, so it is not tagged. `MX-17` |
+| `PlayerCharacterSubclassStub` | A subclass of it declaring nothing of its own, so the flag has to be inherited. `MX-18` |
+| `twisted.internet.task.Clock` | Drives the loop without a reactor, so the `SS` cases advance time rather than waiting for it. The library takes a `clock` argument for this and production leaves it alone — the same seam `evennia-message-bus` uses |
 
 ## Cases
 
@@ -199,20 +204,87 @@ meter that never got there.
 | MX-14 | The post-tick hook runs after the meters have moved, and sees the new stages | test_mx_14_the_post_tick_hook_sees_the_new_stages |
 | MX-15 | The regeneration hook takes both meters and does nothing until a consumer overrides it | test_mx_15_the_regeneration_hook_defaults_to_doing_nothing |
 
+**A holder that is not a player character is tagged at creation**, and that tag is how the clock finds
+it. Player characters are not tagged: they are reached through their session instead, so a tag on them
+would only be something to exclude again.
+
+`survival_is_player_character` is a class attribute, declared `False` on the mixin so a consumer names
+only the exception. It is a class attribute rather than something stored so that subclasses inherit it
+— which is what a filter on the typeclass path could not do, since excluding one path leaves every
+subclass of it behind.
+
+The tag is applied in `at_object_creation`, so **a consumer typeclass that overrides that hook has to
+call `super()`** or its holders are never tagged and never tick, with nothing to say why.
+
+| ID | Case | Test function |
+|---|---|---|
+| MX-16 | A holder that is not a player character is tagged at creation | test_mx_16_a_holder_that_is_not_a_player_character_is_tagged |
+| MX-17 | A holder declaring itself a player character is not tagged | test_mx_17_a_player_character_holder_is_not_tagged |
+| MX-18 | A subclass inherits the declaration, so a player-character subclass is not tagged either | test_mx_18_a_subclass_inherits_the_player_character_declaration |
+
+### SS — the survival service
+
+The clock that steps every holder's meters. A Twisted `LoopingCall` rather than an Evennia script:
+nothing persistent to get stuck stopped, and it is recreated at every boot. Started from the consumer's
+`at_server_start()` rather than `AppConfig.ready()`, because `ready()` also runs during `evennia
+migrate` and management commands, where a clock should not be spinning up.
+
+**Two passes, because the two kinds of holder are found differently.**
+
+- **Player characters, from their sessions.** They come and go from play, and a session is the only
+  thing that says which are in it right now. This is FCM's existing loop, near enough verbatim.
+- **Everything else, from the tag.** A mob is in the game whether or not anyone is near it, so it is
+  found by query — `get_by_tag`, on the tag the mixin writes at creation. Indexed, so only the holders
+  are loaded and the cost is proportional to how many there are rather than to the size of the world.
+
+The idmapper cache is not used. It holds only what has been touched since boot, so a mob nobody has
+visited would silently never tick and then start when a player wandered past.
+
+**The two sets do not overlap**, because a player character is never tagged. The exception is an
+admin puppeting a tagged object, which would be reached twice; not worth guarding.
+
+**A tagged holder whose class no longer carries the mixin is not defended against.** The tick would
+raise, the per-holder guard names it in the log, and the walk carries on. Cleaning that up is
+deleting and respawning a mob.
+
+**Two guards, and the inner one is the important half.** Per holder, so a consumer's hook raising names
+that holder in the log and the walk carries on to everyone else; and one around the whole walk, so
+nothing can reach the `LoopingCall` and stop it silently. Without the inner guard the first broken
+holder ends the tick, and everybody after them in the list quietly does not get hungry.
+
+**`survival.log` stays silent unless something is wrong.** Four kinds of line in that file and no others: started, stopped,
+a tick raised on this holder, the walk itself raised. Three of the four are faults, which is what makes
+an empty `survival.log` mean something. Start and stop earn their place by locating a fault against a
+reboot.
+
+| ID | Case | Test function |
+|---|---|---|
+| SS-01 | A puppeted holder is reached through its session | test_ss_01_a_puppeted_holder_is_reached_through_its_session |
+| SS-02 | A tagged holder is reached whether or not anyone is near it | test_ss_02_a_tagged_holder_is_reached_with_nobody_near_it |
+| SS-03 | A holder that is neither puppeted nor tagged is not reached | test_ss_03_an_unpuppeted_untagged_holder_is_not_reached |
+| SS-04 | A holder whose tick raises is named in a `survival.log` line, and the walk carries on to the rest | test_ss_04_a_holder_that_raises_is_logged_and_the_walk_carries_on |
+| SS-05 | Nothing raised inside the walk reaches the loop, which keeps running | test_ss_05_nothing_raised_inside_the_walk_reaches_the_loop |
+| SS-06 | Starting runs the tick on the configured meter interval | test_ss_06_starting_runs_the_tick_on_the_meter_interval |
+| SS-07 | Starting a second time does not leave two loops running | test_ss_07_starting_twice_does_not_leave_two_loops |
+| SS-08 | Stopping stops the loop | test_ss_08_stopping_stops_the_loop |
+| SS-09 | Starting and stopping each write one `survival.log` line | test_ss_09_starting_and_stopping_each_write_one_line |
+| SS-10 | A tick with nothing wrong writes no `survival.log` line | test_ss_10_a_clean_tick_writes_no_log_line |
+| SS-11 | A guard hook returning `None` cancels the tick, as `False` does | test_ss_11_a_guard_returning_none_cancels_the_tick |
+
 ## Open decisions
 
 Questions still open, listed so they are not forgotten, and deliberately without cases. A case is a
 commitment, so nothing becomes one until it has been decided. The planned shape for most of what
 follows is in [design.md](design.md).
 
-- **[TBD — needs discussion: what a meter is.** Stages, their ordering, the thresholds that change
-  behaviour, and how a consumer names them.]
-- **[TBD — needs discussion: the tick.** What walks the meters, how often, which characters it reaches,
-  and how it behaves when the game runs as more than one process.]
-- **[TBD — needs discussion: the regeneration pipeline.** How several meters combine into one
-  heal/stall/bleed decision, and how the outcome is handed back to the consumer.]
-- **[TBD — needs discussion: the container primitive.** Whether a refillable drink container is library
-  mechanism or consumer content.]
-- **[TBD — needs discussion: the clocks themselves.** The two intervals are settled and covered by
-  `CF`; what runs on them, and how the walk over characters behaves when the game runs as more than one
-  process, is not.]
+- **[TBD — needs discussion: how a clock gathers the holders to tick.** The two intervals are settled
+  and the tick body is built; what walks the holders, and how it behaves when the game runs as more
+  than one process, is not.]
+- **[TBD — needs discussion: the superuser command** for seeing whether the clocks are running and
+  restarting one that has stopped. `evennia-mob-spawner`'s `commands.py` is the shape to follow.]
+- **[TBD — needs discussion: when a free pass is spendable.** The library spends one wherever the meter
+  happens to be; FCM honours it only at the best stage. `MX-12` covers the library's behaviour, but the
+  divergence has not been agreed.]
+
+Eating, drinking and drink containers are **not** open questions — they are out of scope. See
+[design.md](design.md) § Out of scope.

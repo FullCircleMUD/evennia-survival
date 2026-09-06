@@ -2,6 +2,35 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-06 — the meter clock, and who it reaches
+
+52 tests, all passing. Characters and mobs now get hungry on a timer. Fourteen cases, `MX-16` to
+`MX-18` and `SS-01` to `SS-11`.
+
+- **A Twisted `LoopingCall`, not an Evennia script.** Nothing persistent to get stuck stopped, and
+  recreated at every boot. Started from the consumer's `at_server_start()`, not `AppConfig.ready()` —
+  that also runs during `evennia migrate`, where a clock should not be spinning up. Starting twice is
+  a no-op, because Evennia runs `at_server_start()` on reload as well as boot.
+- **Two passes, because the two kinds of holder are found differently.** Player characters from their
+  sessions, since a session is the only thing that says who is in play. Everything else from a tag the
+  mixin writes at `at_object_creation`, so a mob is ticked whether or not anyone is near it. The sets
+  cannot overlap: a player character is never tagged.
+- **`survival_is_player_character`** decides whether the tag is written. A class attribute rather than
+  stored state, so subclasses inherit it — a filter on the typeclass path could not do that, since
+  excluding one path leaves every subclass behind.
+- **The idmapper cache was tried and rejected.** It holds only what has been touched since boot, so a
+  mob nobody has visited would never tick and then start when a player wandered past. Verified
+  separately that being puppeted does not protect an object from a cache flush either — only having
+  `ndb` set does.
+- **Two guards, and the inner one matters most.** Per holder, so a consumer's broken hook is named in
+  `survival.log` with its traceback and the walk carries on; and one around the whole pass, so nothing
+  reaches the `LoopingCall` and stops it silently.
+- **`survival.log` stays quiet unless something is wrong.** Four kinds of line: started, stopped, a
+  tick raised on this holder, the pass raised. Start and stop earn their place by placing a fault
+  against a reboot.
+- **A guard returning `None` now cancels**, matching Evennia's falsy convention rather than testing for
+  `False`. A bare `return` in a guard is what most people write, and it used to tick anyway.
+
 ## 2026-09-06 — meters, and the seams around the tick
 
 38 tests, all passing. An object can carry meters and they can be moved. No clock drives them yet.

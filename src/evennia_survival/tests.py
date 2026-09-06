@@ -5,7 +5,7 @@ Every test carries its case ID from docs/test-plan.md as its docstring, so
 the coverage trail reads in both directions.
 """
 
-from unittest import TestCase
+from unittest import TestCase, mock
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase as DjangoTestCase
@@ -21,7 +21,16 @@ from evennia_survival.config import (
     check_settings,
 )
 from evennia_survival.log import survival_log
-from evennia_survival.services import survival_tick
+from evennia_survival.mixins import SURVIVAL_TAG, SURVIVAL_TAG_CATEGORY
+from evennia_survival.config import get_meter_interval
+from evennia_survival.services import (
+    guarded_survival_pass,
+    run_survival_pass,
+    start_survival_clock,
+    stop_survival_clock,
+    survival_holders,
+    survival_tick,
+)
 from evennia_survival.stages import SurvivalStage
 from tests.stage_stubs import HungerStageStub
 
@@ -369,6 +378,33 @@ class SurvivalMixinTests(DjangoTestCase):
             (self.best.shifted(-1), self.best.shifted(-1)),
         )
 
+    def _is_tagged(self, obj):
+        return obj.tags.has(SURVIVAL_TAG, category=SURVIVAL_TAG_CATEGORY)
+
+    def test_mx_16_a_holder_that_is_not_a_player_character_is_tagged(self):
+        """MX-16"""
+        self.assertTrue(self._is_tagged(self.obj))
+
+    def test_mx_17_a_player_character_holder_is_not_tagged(self):
+        """MX-17"""
+        from evennia import create_object
+
+        character = create_object(
+            "tests.game_typeclasses.PlayerCharacterStub", key="player"
+        )
+
+        self.assertFalse(self._is_tagged(character))
+
+    def test_mx_18_a_subclass_inherits_the_player_character_declaration(self):
+        """MX-18"""
+        from evennia import create_object
+
+        subclassed = create_object(
+            "tests.game_typeclasses.PlayerCharacterSubclassStub", key="also a player"
+        )
+
+        self.assertFalse(self._is_tagged(subclassed))
+
     def test_mx_15_the_regeneration_hook_defaults_to_doing_nothing(self):
         """MX-15"""
         # The library never calls this — a consumer's clock does, once there
@@ -382,3 +418,158 @@ class SurvivalMixinTests(DjangoTestCase):
         self.assertIsNone(result)
         self.assertIs(self.obj.hunger_level, self.best)
         self.assertIs(self.obj.thirst_level, self.best)
+
+
+class _FakeSession:
+    """A session as the character pass sees it: something with a puppet."""
+
+    def __init__(self, puppet):
+        self._puppet = puppet
+
+    def get_puppet(self):
+        return self._puppet
+
+
+class SurvivalServiceTests(DjangoTestCase):
+    """SS — the clock that steps every holder's meters."""
+
+    def setUp(self):
+        from evennia import create_object
+
+        from tests.stage_stubs import HungerStageStub
+
+        self.best = HungerStageStub.FULL
+        self.create = create_object
+
+    def _sessions_of(self, *puppets):
+        """Patch the session handler so the character pass sees these."""
+        handler = mock.Mock()
+        handler.get_sessions.return_value = [_FakeSession(p) for p in puppets]
+        return mock.patch("evennia.SESSION_HANDLER", handler)
+
+    def test_ss_01_a_puppeted_holder_is_reached_through_its_session(self):
+        """SS-01"""
+        played = self.create(
+            "tests.game_typeclasses.PlayerCharacterStub", key="played"
+        )
+
+        with self._sessions_of(played):
+            self.assertIn(played, survival_holders())
+
+    def test_ss_02_a_tagged_holder_is_reached_with_nobody_near_it(self):
+        """SS-02"""
+        mob = self.create("tests.game_typeclasses.SurvivalObjectStub", key="mob")
+
+        with self._sessions_of():
+            self.assertIn(mob, survival_holders())
+
+    def test_ss_03_an_unpuppeted_untagged_holder_is_not_reached(self):
+        """SS-03"""
+        offline = self.create(
+            "tests.game_typeclasses.PlayerCharacterStub", key="logged out"
+        )
+
+        with self._sessions_of():
+            self.assertNotIn(offline, survival_holders())
+
+    def test_ss_04_a_holder_that_raises_is_logged_and_the_walk_carries_on(self):
+        """SS-04"""
+        broken = self.create("tests.game_typeclasses.RaisingSurvivalStub", key="broken")
+        healthy = self.create("tests.game_typeclasses.SurvivalObjectStub", key="fine")
+
+        with self._sessions_of():
+            with mock.patch("evennia_survival.services.survival_log") as logged:
+                run_survival_pass()
+
+        self.assertIs(healthy.hunger_level, self.best.shifted(-1))
+        self.assertTrue(
+            any("broken" in str(call) for call in logged.call_args_list),
+            "the failing holder should be named in survival.log",
+        )
+
+    def test_ss_05_nothing_raised_inside_the_walk_reaches_the_loop(self):
+        """SS-05"""
+        with mock.patch(
+            "evennia_survival.services.run_survival_pass",
+            side_effect=RuntimeError("boom"),
+        ):
+            with mock.patch("evennia_survival.services.survival_log"):
+                guarded_survival_pass()  # must not raise
+
+    def test_ss_06_starting_runs_the_tick_on_the_meter_interval(self):
+        """SS-06"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+        mob = self.create("tests.game_typeclasses.SurvivalObjectStub", key="mob")
+
+        with self._sessions_of():
+            start_survival_clock(clock=clock)
+            try:
+                clock.advance(get_meter_interval())
+            finally:
+                stop_survival_clock()
+
+        self.assertIs(mob.hunger_level, self.best.shifted(-1))
+
+    def test_ss_07_starting_twice_does_not_leave_two_loops(self):
+        """SS-07"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+        mob = self.create("tests.game_typeclasses.SurvivalObjectStub", key="mob")
+
+        with self._sessions_of():
+            start_survival_clock(clock=clock)
+            start_survival_clock(clock=clock)
+            try:
+                clock.advance(get_meter_interval())
+            finally:
+                stop_survival_clock()
+
+        # One step, not two.
+        self.assertIs(mob.hunger_level, self.best.shifted(-1))
+
+    def test_ss_08_stopping_stops_the_loop(self):
+        """SS-08"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+        mob = self.create("tests.game_typeclasses.SurvivalObjectStub", key="mob")
+
+        with self._sessions_of():
+            start_survival_clock(clock=clock)
+            stop_survival_clock()
+            clock.advance(get_meter_interval() * 3)
+
+        self.assertIs(mob.hunger_level, self.best)
+
+    def test_ss_09_starting_and_stopping_each_write_one_line(self):
+        """SS-09"""
+        from twisted.internet.task import Clock
+
+        clock = Clock()
+
+        with mock.patch("evennia_survival.services.survival_log") as logged:
+            start_survival_clock(clock=clock)
+            stop_survival_clock()
+
+        self.assertEqual(logged.call_count, 2)
+
+    def test_ss_10_a_clean_tick_writes_no_log_line(self):
+        """SS-10"""
+        self.create("tests.game_typeclasses.SurvivalObjectStub", key="mob")
+
+        with self._sessions_of():
+            with mock.patch("evennia_survival.services.survival_log") as logged:
+                run_survival_pass()
+
+        self.assertEqual(logged.call_count, 0)
+
+    def test_ss_11_a_guard_returning_none_cancels_the_tick(self):
+        """SS-11"""
+        guarded = self.create("tests.game_typeclasses.NoneGuardStub", key="bare return")
+
+        survival_tick(guarded)
+
+        self.assertIs(guarded.hunger_level, self.best)

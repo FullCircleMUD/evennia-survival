@@ -123,10 +123,53 @@ damage and kills nothing, because healing rates depend on posture and location a
 and loot. It hands you both meters on a clock and gets out of the way. Whatever guard you want is the
 first line of your own method — there is no pre-hook here, because there is nothing of ours to cancel.
 
+## 8. Start the clock
+
+```python
+# server/conf/at_server_startstop.py
+from evennia_survival.services import start_survival_clock, stop_survival_clock
+
+
+def at_server_start():
+    start_survival_clock()
+
+
+def at_server_stop():
+    stop_survival_clock()
+```
+
+Not from `AppConfig.ready()` — that also runs during `evennia migrate` and management commands, where
+a clock should not be spinning up. Starting twice is a no-op, so the reload that runs `at_server_start`
+again does not leave two loops ticking.
+
+**Who gets ticked, and how they are found.** Player characters come from their sessions, so they tick
+while they are being played and not otherwise. Everything else is found by a tag the mixin writes at
+creation, so a mob is ticked whether or not anyone is near it.
+
+**That tag is why `at_object_creation` matters.** A typeclass of yours that overrides that hook without
+calling `super()` never gets tagged, and its holders silently never tick.
+
+## Watching it
+
+`survival.log`, beside `server.log` in your `LOG_DIR`. It stays silent unless something is wrong, so
+anything in it is worth reading. Four kinds of line and no others:
+
+- the clock started, and at what interval
+- the clock stopped
+- a tick raised on a named holder — with the traceback, and the walk carried on to everyone else
+- the pass itself raised
+
+A hook of yours that raises lands in the third of those, named, rather than stopping the clock.
+
+## Feeding and watering are yours
+
+There is no `eat`, no `drink` and no container here, deliberately. The library never decides what your
+game feeds anyone or how it manages it — call `restore_hunger()` or `restore_thirst()` from whatever
+command, spell or item you already have. See
+[design.md](design.md) § Out of scope for why the seam sits there.
+
 ## Still to come
 
 Not built yet. Listed so the shape of the finished install is visible:
 
-- The clocks themselves, and how they gather the holders to tick.
-- The mixin an item typeclass adds to become a drink container.
-- The `eat` and `drink` commands, and the hooks behind them.
+- The regeneration clock. `at_regeneration_tick` exists and nothing calls it yet.
