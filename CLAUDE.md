@@ -131,7 +131,7 @@ evennia-survival/
 │       ├── stages.py          # SurvivalStage — the base a consumer subclasses
 │       ├── mixins.py          # SurvivalMixin — the meters and the hooks
 │       ├── services.py        # the tick body; not a method on the holder
-│       ├── log.py             # shim onto Evennia's logger → survival.log
+│       ├── log.py             # binds survival_log via evennia-logging-extension → survival.log
 │       └── tests.py           # unit tests, run via runtests.py
 └── tests/                     # standalone test infrastructure
     ├── __init__.py

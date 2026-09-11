@@ -2,6 +2,16 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-11 — logging through evennia-logging-extension
+
+60 tests, all passing. `log.py` now binds `survival_log` through the extension's `make_logger` —
+same bound name, same `survival.log`, same call signature, so no call site changed. The extension is
+a hard dependency, declared in `pyproject.toml` and installed from its sibling checkout.
+
+- **SC-02 retired.** "A log call outside an Evennia engine is a silent no-op" was the old shim's own
+  behaviour, not the library's; delivery semantics are the extension's to test.
+- The demo gamedir installs the extension via `examples/requirements.txt`.
+
 ## 2026-09-06 — the regeneration clock, and the library does what it set out to
 
 61 tests, all passing. Both clocks run. Nine cases, `RS-01` to `RS-09`.

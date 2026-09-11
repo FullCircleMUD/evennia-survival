@@ -26,6 +26,13 @@ survives being archived and rebuilt, which depends on how the meters are stored 
 
 `[TBD — needs discussion: not yet assessed.]`
 
+## evennia-logging-extension
+
+**Hard dependency.** `log.py` binds `survival_log` through its `make_logger`, and every line the
+library emits goes through that binding to `survival.log`. The library does not run without it —
+`pyproject.toml` declares it. Nothing flows the other way: the extension knows nothing about the
+meters.
+
 ## evennia-message-bus
 
 `[TBD — needs discussion: not yet assessed.]`

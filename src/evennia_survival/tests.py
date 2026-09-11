@@ -21,7 +21,6 @@ from evennia_survival.config import (
     SETTING_THIRST_STAGES,
     check_settings,
 )
-from evennia_survival.log import survival_log
 from evennia_survival.mixins import SURVIVAL_TAG, SURVIVAL_TAG_CATEGORY
 from evennia_survival.config import get_meter_interval, get_regen_interval
 from evennia_survival.services import (
@@ -55,10 +54,6 @@ class ScaffoldTests(TestCase):
     def test_sc_01_the_package_is_importable_and_versioned(self):
         """SC-01"""
         self.assertTrue(evennia_survival.__version__)
-
-    def test_sc_02_the_log_shim_is_a_no_op_outside_evennia(self):
-        """SC-02"""
-        self.assertIsNone(survival_log("scaffold check"))
 
 
 class SurvivalStageTests(TestCase):

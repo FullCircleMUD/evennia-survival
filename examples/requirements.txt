@@ -18,4 +18,6 @@ evennia
 # is never loaded. The marker means pip skips it everywhere else.
 sqlean.py; sys_platform == 'darwin'
 
+# Not on PyPI — the sibling checkout provides it.
+-e ../../evennia-logging-extension
 -e ..

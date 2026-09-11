@@ -8,9 +8,11 @@ of what is wrong at once rather than one thing per restart.
 
 ## 1. Install the package
 
-Nothing is published yet, so install from a checkout:
+Nothing is published yet, so install from a checkout — and `evennia-logging-extension`, the one
+dependency beyond Evennia itself, is also unpublished, so it installs from its own checkout first:
 
 ```
+pip install -e path/to/evennia-logging-extension
 pip install -e path/to/evennia-survival
 ```
 
