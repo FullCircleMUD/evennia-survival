@@ -2,6 +2,18 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-11 — interoperability assessed against every sibling
+
+Every relationship in [interoperability.md](interoperability.md) is now ruled: evennia-logging-extension
+is the only dependency, and all fifteen other siblings are **no coupling**, each with the reason.
+
+- The rulings rest on three properties: no tables (state is Attributes on the holder), no imports
+  beyond Evennia and the extension, and holders found only through sessions and the library's own tag.
+- The preamble now matches the corpus shape: every sibling covered including the `fcm-*` libraries,
+  clearances grounded in what the library holds today.
+- Where a sibling had already ruled from its side (archive, calendar, database-cascade, equipment,
+  scaling), the sections mirror each other.
+
 ## 2026-09-11 — logging through evennia-logging-extension
 
 60 tests, all passing. `log.py` now binds `survival_log` through the extension's `make_logger` —
