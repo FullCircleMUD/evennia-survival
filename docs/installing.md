@@ -194,8 +194,9 @@ None. Every setting the library reads is above.
 ## Watching it
 
 `survival.log`, beside `server.log` in your `LOG_DIR`. It stays silent unless something is wrong, so
-anything in it is worth reading. Four kinds of line and no others:
+anything in it is worth reading. Five kinds of line and no others:
 
+- the boot check refused to start — the same text as the exception, the whole list of what to fix
 - a clock started, and at what interval
 - a clock stopped
 - a tick raised on a named holder — with the traceback, and the walk carried on to everyone else

@@ -122,6 +122,14 @@ saying why.
 Cases assert that a refusal happens, not what it says. The exception is `CF-08`, where the count of
 problems *is* the behaviour under test.
 
+**A refusal is logged before it is raised.** The same text lands in `survival.log` at ERROR and in
+the exception, so a consumer reading either channel gets the whole list of what to fix. Every refusal
+funnels through the one raise at the end of `check_settings()`, so same-text equality (`CF-17`)
+carries every refusal reason into the log without a delivery case per reason. The delivery cases read
+the log back **from disk, never by mocking the log function** — a mocked delivery case can pass while
+no line ever lands. A passing check writes nothing (`CF-18`): the boot check obeys `survival.log`'s
+stays-silent rule.
+
 **The two clock intervals are required too, not defaulted.** The library could invent a cadence, but
 the right one is a game-design decision — a default would ship our number in someone's game without
 anyone having chosen it. Each must be set, must be an integer, and must be positive.
@@ -152,6 +160,9 @@ construction rather than by approximation.
 | CF-13 | An interval that is not an integer is refused, a numeric string included | test_cf_13_an_interval_that_is_not_an_integer_is_refused |
 | CF-14 | An interval of zero or less is refused | test_cf_14_an_interval_of_zero_or_less_is_refused |
 | CF-15 | A problem in the regen interval alone is reported, so both intervals are checked | test_cf_15_a_problem_in_the_regen_interval_alone_is_reported |
+| CF-16 | A refusal is logged to disk at ERROR | test_cf_16_a_refusal_is_logged_to_disk_at_error |
+| CF-17 | The log line and the exception carry the same text | test_cf_17_the_log_line_and_the_exception_carry_the_same_text |
+| CF-18 | A passing check writes no log line | test_cf_18_a_passing_check_writes_no_log_line |
 
 ### MX — the meters an object carries
 

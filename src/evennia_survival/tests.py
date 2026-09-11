@@ -5,6 +5,7 @@ Every test carries its case ID from docs/test-plan.md as its docstring, so
 the coverage trail reads in both directions.
 """
 
+import os
 from unittest import TestCase, mock
 
 from django.core.exceptions import ImproperlyConfigured
@@ -110,6 +111,67 @@ class CheckSettingsTests(TestCase):
             with self.assertRaises(ImproperlyConfigured) as caught:
                 check_settings()
         return str(caught.exception)
+
+    # CF-16 to CF-18 read the log back from disk rather than mocking the log
+    # function — a mocked delivery case can pass while no line ever reaches a
+    # file. See the CF notes in docs/test-plan.md.
+
+    def _read_back_logs(self):
+        """Everything under the suite's LOG_DIR, as one string."""
+        from django.conf import settings
+
+        text = []
+        for name in sorted(os.listdir(settings.LOG_DIR)):
+            if name.endswith(".log"):
+                path = os.path.join(settings.LOG_DIR, name)
+                with open(path, encoding="utf-8") as handle:
+                    text.append(handle.read())
+        return "\n".join(text)
+
+    def _clear_logs(self):
+        """Empty LOG_DIR's files so a line read back was written by this test.
+
+        Truncated, never removed: Evennia's ``_open_log_file`` caches the
+        handle after the first write, and removing the file leaves that
+        handle appending to an unlinked inode — every later line silently
+        vanishes. An append-mode handle seeks to the end on each write, so a
+        truncated file stays live.
+        """
+        from django.conf import settings
+
+        for name in os.listdir(settings.LOG_DIR):
+            if name.endswith(".log"):
+                with open(os.path.join(settings.LOG_DIR, name), "w"):
+                    pass
+
+    def test_cf_16_a_refusal_is_logged_to_disk_at_error(self):
+        """CF-16"""
+        self._clear_logs()
+        with override_settings(
+            **{SETTING_HUNGER_STAGES: None, SETTING_METER_INTERVAL: "30"}
+        ):
+            with self.assertRaises(ImproperlyConfigured):
+                check_settings()
+        logged = self._read_back_logs()
+        self.assertIn("[ERROR]", logged)
+        self.assertIn(SETTING_HUNGER_STAGES, logged)
+        self.assertIn(SETTING_METER_INTERVAL, logged)
+
+    def test_cf_17_the_log_line_and_the_exception_carry_the_same_text(self):
+        """CF-17"""
+        self._clear_logs()
+        with override_settings(
+            **{SETTING_HUNGER_STAGES: None, SETTING_METER_INTERVAL: "30"}
+        ):
+            with self.assertRaises(ImproperlyConfigured) as caught:
+                check_settings()
+        self.assertIn(str(caught.exception), self._read_back_logs())
+
+    def test_cf_18_a_passing_check_writes_no_log_line(self):
+        """CF-18"""
+        self._clear_logs()
+        check_settings()
+        self.assertEqual(self._read_back_logs().strip(), "")
 
     def test_cf_01_a_valid_configuration_raises_nothing(self):
         """CF-01"""

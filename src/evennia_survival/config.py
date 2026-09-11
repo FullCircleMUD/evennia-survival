@@ -103,10 +103,18 @@ def check_settings() -> None:
             )
 
     if problems:
-        raise ImproperlyConfigured(
-            "evennia-survival cannot start:"
-            + "".join(f"{PROBLEM_PREFIX}{problem}" for problem in problems)
-        ) from cause
+        message = "evennia-survival cannot start:" + "".join(
+            f"{PROBLEM_PREFIX}{problem}" for problem in problems
+        )
+
+        # Same text in both channels: a consumer reading the log alone gets
+        # the whole list of what to fix. Imported inside the branch — config
+        # must import before Django is ready, and the linter holds log
+        # imports out of this module's scope.
+        from evennia_survival.log import survival_log
+
+        survival_log(message, level="ERROR")
+        raise ImproperlyConfigured(message) from cause
 
 
 def get_hunger_stages():

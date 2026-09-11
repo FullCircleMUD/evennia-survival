@@ -2,6 +2,20 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-11 — the boot refusal is logged
+
+64 tests, all passing. Three new cases, `CF-16` to `CF-18`.
+
+- **A refusal lands in `survival.log` at ERROR before it is raised**, same text in both channels, so
+  a consumer reading the log alone gets the whole list of what to fix. Every refusal funnels through
+  the one raise in `check_settings()`, so same-text equality carries every refusal reason into the
+  log without a delivery case per reason.
+- The delivery cases read the log back from disk, never by mocking the log function — a mocked
+  delivery case can pass while no line ever lands.
+- A passing check writes nothing: the boot check obeys the stays-silent rule, now five kinds of line.
+- Validated live: a demo gamedir with `SURVIVAL_REGEN_INTERVAL` unset refused to boot and wrote the
+  refusal, full text, to `survival.log`.
+
 ## 2026-09-11 — standards linter clean
 
 0 errors, 0 warns. The last of it:
