@@ -2,6 +2,16 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-11 — standards linter clean
+
+0 errors, 0 warns. The last of it:
+
+- installing.md gained the three standard sections — required settings, optional settings (none),
+  and what is not checked for you.
+- `SURVIVAL_TAG` / `SURVIVAL_TAG_CATEGORY` moved from mixins.py to config.py, where the standard
+  keeps module-level constants.
+- Every Evennia import now carries the comment saying why that module needs the engine.
+
 ## 2026-09-11 — one tick per holder, however many sessions
 
 61 tests, all passing. One new case, `SS-12`.

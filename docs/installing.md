@@ -159,6 +159,38 @@ creation, so a mob is ticked whether or not anyone is near it.
 **That tag is why `at_object_creation` matters.** A typeclass of yours that overrides that hook without
 calling `super()` never gets tagged, and its holders silently never tick.
 
+## Required settings
+
+All four, detailed in steps 3–5 above. Each is checked at boot; anything missing or malformed refuses
+the start with every problem listed at once.
+
+| Setting | What it does |
+|---|---|
+| `SURVIVAL_HUNGER_STAGES` | Dotted path to your hunger stage enum |
+| `SURVIVAL_THIRST_STAGES` | Dotted path to your thirst stage enum |
+| `SURVIVAL_METER_INTERVAL` | Seconds between meter steps — a positive integer |
+| `SURVIVAL_REGEN_INTERVAL` | Seconds between regeneration passes — a positive integer |
+
+None has a default: there is no stage list the library could invent, and a default cadence would put
+our number in your game without anyone having chosen it.
+
+## Optional settings
+
+None. Every setting the library reads is above.
+
+## What is not checked for you
+
+- **`INSTALLED_APPS`.** Leave the library out of it and `AppConfig.ready()` never runs, so nothing
+  above gets validated. This is always the first thing to check when a library appears to be doing
+  nothing.
+- **Stage direction.** A higher value must be a better stage. A set numbered the other way round is
+  just as valid to the library, and produces a meter where eating makes the character hungrier.
+- **`super()` in `at_object_creation`.** A typeclass that overrides it without calling up never gets
+  tagged, and its holders silently never tick.
+- **That the clocks are actually started.** Nothing verifies your `at_server_start` calls the two
+  start functions — a game that never starts them boots looking healthy and nobody ever gets hungry.
+  An empty `survival.log` where the started lines should be is the tell.
+
 ## Watching it
 
 `survival.log`, beside `server.log` in your `LOG_DIR`. It stays silent unless something is wrong, so

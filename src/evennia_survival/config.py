@@ -25,6 +25,12 @@ SETTING_THIRST_STAGES = "SURVIVAL_THIRST_STAGES"
 SETTING_METER_INTERVAL = "SURVIVAL_METER_INTERVAL"
 SETTING_REGEN_INTERVAL = "SURVIVAL_REGEN_INTERVAL"
 
+#: The tag a non-player-character holder carries, and how the clock finds it.
+#: Shared so the mixin that writes it and the service that queries it cannot
+#: drift apart.
+SURVIVAL_TAG = "survival"
+SURVIVAL_TAG_CATEGORY = "survival"
+
 #: What each collected problem is prefixed with in the refusal message. One
 #: problem per line, so a consumer with four things wrong works through a list
 #: rather than a paragraph. Named so a test can count problems without pinning

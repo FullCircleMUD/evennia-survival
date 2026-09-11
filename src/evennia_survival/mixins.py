@@ -19,9 +19,17 @@ the library is for and is not an extension point, so it lives in
 ``services.py`` and this mixin carries only the hooks into it.
 """
 
+# AttributeProperty is how the meters persist on the holder — Evennia's
+# attribute handler is the storage this mixin hangs its state off, and there
+# is no engine-free equivalent to import instead.
 from evennia.typeclasses.attributes import AttributeProperty
 
-from evennia_survival.config import get_hunger_stages, get_thirst_stages
+from evennia_survival.config import (
+    SURVIVAL_TAG,
+    SURVIVAL_TAG_CATEGORY,
+    get_hunger_stages,
+    get_thirst_stages,
+)
 
 
 def _best(stages):
@@ -43,13 +51,6 @@ def _default_hunger_name() -> str:
 def _default_thirst_name() -> str:
     """As above, for the thirst meter."""
     return _best(get_thirst_stages()).name
-
-
-#: The tag a non-player-character holder carries, and how the clock finds it.
-#: Shared so the mixin that writes it and the service that queries it cannot
-#: drift apart.
-SURVIVAL_TAG = "survival"
-SURVIVAL_TAG_CATEGORY = "survival"
 
 
 class SurvivalMixin:

@@ -21,7 +21,7 @@ from evennia_survival.config import (
     SETTING_THIRST_STAGES,
     check_settings,
 )
-from evennia_survival.mixins import SURVIVAL_TAG, SURVIVAL_TAG_CATEGORY
+from evennia_survival.config import SURVIVAL_TAG, SURVIVAL_TAG_CATEGORY
 from evennia_survival.config import get_meter_interval, get_regen_interval
 from evennia_survival.services import (
     guarded_regeneration_pass,

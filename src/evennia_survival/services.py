@@ -11,13 +11,14 @@ to something is the consumer's entirely, and that is
 ``at_regeneration_tick``.
 """
 
-from evennia_survival.config import get_meter_interval, get_regen_interval
-from evennia_survival.log import survival_log
-from evennia_survival.mixins import (
+from evennia_survival.config import (
     SURVIVAL_TAG,
     SURVIVAL_TAG_CATEGORY,
-    SurvivalMixin,
+    get_meter_interval,
+    get_regen_interval,
 )
+from evennia_survival.log import survival_log
+from evennia_survival.mixins import SurvivalMixin
 
 #: The running clock, or ``None``. Module state so a second ``start`` cannot
 #: leave two loops ticking the same holders — a consumer calls the starter
@@ -67,7 +68,12 @@ def survival_holders() -> list:
     than one session, or a tagged object an admin has puppeted, appears once
     and is ticked once.
     """
+    # The sessions are where puppeted holders live, and they exist only in a
+    # running engine. Imported here rather than at module scope so the module
+    # imports without one.
     from evennia import SESSION_HANDLER
+
+    # The object table is where tagged holders live — same story.
     from evennia.objects.models import ObjectDB
 
     holders = []
