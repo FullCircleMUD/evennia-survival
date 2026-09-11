@@ -2,6 +2,16 @@
 
 Running log of milestones with links to evidence. Reverse chronological — newest first.
 
+## 2026-09-11 — one tick per holder, however many sessions
+
+61 tests, all passing. One new case, `SS-12`.
+
+- **The gathering deduplicates before returning.** A character behind more than one session
+  (`MULTISESSION_MODE >= 1`) was appended once per session and ticked that many times per pass —
+  meters falling at double rate for a twice-connected player, and both passes affected. `dict.fromkeys`
+  on the way out fixes both at once, and covers the admin-puppets-a-tagged-object overlap the
+  docstring previously wrote off as not worth guarding.
+
 ## 2026-09-11 — interoperability assessed against every sibling
 
 Every relationship in [interoperability.md](interoperability.md) is now ruled: evennia-logging-extension

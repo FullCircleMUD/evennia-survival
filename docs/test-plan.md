@@ -278,6 +278,7 @@ reboot.
 | SS-09 | Starting and stopping each write one `survival.log` line | test_ss_09_starting_and_stopping_each_write_one_line |
 | SS-10 | A tick with nothing wrong writes no `survival.log` line | test_ss_10_a_clean_tick_writes_no_log_line |
 | SS-11 | A guard hook returning `None` cancels the tick, as `False` does | test_ss_11_a_guard_returning_none_cancels_the_tick |
+| SS-12 | A holder puppeted by more than one session is gathered once, so it ticks once per pass | test_ss_12_a_holder_with_two_sessions_is_gathered_once |
 
 ### RS — the regeneration service
 

@@ -482,6 +482,15 @@ class SurvivalServiceTests(DjangoTestCase):
         with self._sessions_of():
             self.assertNotIn(offline, survival_holders())
 
+    def test_ss_12_a_holder_with_two_sessions_is_gathered_once(self):
+        """SS-12"""
+        played = self.create(
+            "tests.game_typeclasses.PlayerCharacterStub", key="played"
+        )
+
+        with self._sessions_of(played, played):
+            self.assertEqual(survival_holders().count(played), 1)
+
     def test_ss_04_a_holder_that_raises_is_logged_and_the_walk_carries_on(self):
         """SS-04"""
         broken = self.create("tests.game_typeclasses.RaisingSurvivalStub", key="broken")

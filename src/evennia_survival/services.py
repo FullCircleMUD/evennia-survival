@@ -63,8 +63,9 @@ def survival_holders() -> list:
     loaded and the cost follows how many there are rather than the size of
     the world.
 
-    The two sets cannot overlap except when an admin puppets a tagged object,
-    which is not worth guarding against.
+    The list is deduplicated before it is returned: a character behind more
+    than one session, or a tagged object an admin has puppeted, appears once
+    and is ticked once.
     """
     from evennia import SESSION_HANDLER
     from evennia.objects.models import ObjectDB
@@ -78,7 +79,9 @@ def survival_holders() -> list:
     holders.extend(
         ObjectDB.objects.get_by_tag(key=SURVIVAL_TAG, category=SURVIVAL_TAG_CATEGORY)
     )
-    return holders
+    # One tick per holder, however many sessions point at it — a character
+    # behind two sessions (MULTISESSION_MODE >= 1) must not age twice as fast.
+    return list(dict.fromkeys(holders))
 
 
 def run_survival_pass() -> None:
