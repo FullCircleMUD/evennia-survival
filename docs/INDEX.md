@@ -3,8 +3,8 @@
 Catalogue of every design document in this wiki. A document that is not listed here is invisible, so
 index new ones as they are written.
 
-The library is at scaffold stage, so this list is short. It grows as the extraction is designed and
-decisions are recorded.
+The library is complete against what it set out to do — see [progress.md](progress.md) for the
+milestone log.
 
 ## Design
 
