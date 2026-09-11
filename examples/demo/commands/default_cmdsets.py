@@ -16,6 +16,8 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 
 from evennia import default_cmds
 
+from commands.survival_commands import CmdDrink, CmdEat, CmdSurvival
+
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
     """
@@ -31,9 +33,9 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         Populates the cmdset
         """
         super().at_cmdset_creation()
-        #
-        # any commands you add below will overload the default ones.
-        #
+        self.add(CmdEat())
+        self.add(CmdDrink())
+        self.add(CmdSurvival())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

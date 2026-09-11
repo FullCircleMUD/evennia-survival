@@ -36,6 +36,28 @@ SERVERNAME = "demo"
 
 
 ######################################################################
+# evennia-survival
+######################################################################
+
+INSTALLED_APPS += ["evennia_survival"]
+
+# The stages for each meter. Both required — there is no stage list the
+# library could invent. They live under `libraries/` in this gamedir purely
+# because that keeps consumer-declared config in one place; the library reads
+# a module path and has no opinion about the layout.
+#
+# The folder name has to be a valid Python identifier, since the setting is a
+# dotted path: `survival_service`, not `survival-service`.
+SURVIVAL_HUNGER_STAGES = "libraries.survival_service.stages.HungerStage"
+SURVIVAL_THIRST_STAGES = "libraries.survival_service.stages.ThirstStage"
+
+# Deliberately fast, so a meter can be watched moving rather than waited on.
+# A real game would use minutes and tens of minutes.
+SURVIVAL_METER_INTERVAL = 30
+SURVIVAL_REGEN_INTERVAL = 10
+
+
+######################################################################
 # Settings given in secret_settings.py override those in this file.
 ######################################################################
 try:
